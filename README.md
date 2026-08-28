@@ -28,4 +28,11 @@ python3 scripts/install.py --profile codex-macos --check
 ```
 
 Consulta [la arquitectura](docs/architecture.md) y la
-[instalacion en Windows](docs/windows-installation.md).
+[instalacion en Windows](docs/windows-installation.md). La
+[matriz de proyectos](docs/project-migration-matrix.md) define que se migra y la
+[pauta de contratos](docs/project-contracts.md) evita copiar el workflow dentro
+de cada producto.
+
+Las rutas de instalacion siguen los mecanismos documentados de cada harness:
+Codex macOS conserva su home actual; Codex y Cursor en WSL comparten Agent Skills
+desde `~/.agents/skills`. El repositorio no instala plugins de Cursor.

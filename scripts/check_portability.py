@@ -67,6 +67,12 @@ def main() -> int:
         if "pstack" in json.dumps(profile).lower():
             errors.append(f"stable profile depends on pstack: {profile_path.name}")
 
+    installer = (ROOT / "scripts" / "install.py").read_text(encoding="utf-8")
+    if 'home / ".agents" / "skills"' not in installer:
+        errors.append("shared profile does not use the portable Agent Skills root")
+    if 'cursor-user-rules.md' not in installer:
+        errors.append("Cursor global rules handoff is not installed")
+
     role_count = len(list((ROOT / "roles").glob("*.md")))
     codex_agents = list((ROOT / "adapters" / "codex" / "agents").glob("*.toml"))
     cursor_agents = list((ROOT / "adapters" / "cursor" / "agents").glob("*.md"))

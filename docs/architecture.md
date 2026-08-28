@@ -14,6 +14,11 @@
 El rigor se mide por resultado, autoridad, evidencia y estado externo. No exige
 que Sol, Grok, Fable, GLM u otro modelo usen los mismos pasos internos.
 
+En macOS, Codex conserva las skills personales en `~/.codex/skills` para no
+alterar la instalacion probada. En WSL, Codex y Cursor comparten una unica copia
+en `~/.agents/skills`, ruta oficial de ambos harnesses. No se duplican skills en
+dos raices visibles al mismo agente.
+
 ## Repositorios de producto
 
 Los repositorios de producto no reciben una copia completa del workflow.
@@ -31,6 +36,10 @@ Un plugin externo puede complementar capacidades, pero no cambia autoridad,
 ambiente, Gitflow, criterios de aceptacion ni condiciones de parada. Este
 repositorio no instala ni configura `pstack`; cualquier experimento de Cursor
 vive fuera del perfil estable y se evalua contra `conformance/cases/`.
+
+Cursor obtiene el contrato del `AGENTS.md` de cada producto. La copia global
+preparada por el instalador se aplica una sola vez como User Rules; no se usa una
+ruta privada o no documentada de Cursor para inyectarla automaticamente.
 
 ## Infraestructura compartida
 

@@ -54,13 +54,16 @@ def managed_pairs(profile: dict) -> list[tuple[Path, Path]]:
     home = Path.home()
     codex_home = Path(os.environ.get("CODEX_HOME", home / ".codex")).expanduser()
     pairs: list[tuple[Path, Path]] = [(ROOT / "AGENTS.md", codex_home / "AGENTS.md")]
+    shared_skills = "cursor" in profile["harnesses"]
+    skill_root = home / ".agents" / "skills" if shared_skills else codex_home / "skills"
     for skill in sorted((ROOT / "skills").iterdir()):
         if (skill / "SKILL.md").is_file():
-            pairs.append((skill, codex_home / "skills" / skill.name))
+            pairs.append((skill, skill_root / skill.name))
     if "codex" in profile["harnesses"]:
         for agent in sorted((ROOT / "adapters" / "codex" / "agents").glob("*.toml")):
             pairs.append((agent, codex_home / "agents" / agent.name))
     if "cursor" in profile["harnesses"]:
+        pairs.append((ROOT / "AGENTS.md", home / ".config" / "dautia" / "cursor-user-rules.md"))
         for agent in sorted((ROOT / "adapters" / "cursor" / "agents").glob("*.md")):
             pairs.append((agent, home / ".cursor" / "agents" / agent.name))
     return pairs

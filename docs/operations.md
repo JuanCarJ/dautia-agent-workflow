@@ -13,6 +13,10 @@ Ryven y MyRoof permiten web, documentacion, Supabase y Android desde WSL. Las
 fronteras iOS se cierran en Mac. Los demas proyectos portables pueden trabajarse
 en cualquiera de los dos hosts cuando su remoto y `delivery.yaml` esten activos.
 
+La lista vigente y sus exclusiones se mantiene en
+`docs/project-migration-matrix.md`. No se migra un repo por el solo hecho de
+existir en disco.
+
 ## Despliegues
 
 El host ejecutor debe tener un checkout limpio del SHA autorizado y las
@@ -21,3 +25,6 @@ el workflow global no contiene IDs mutables ni secretos.
 
 Antes de desplegar desde otro host, verificar proveedor, target, revision
 actual, rollback y que no exista otra transaccion sobre el mismo ambiente.
+
+Los repositorios de producto nunca reciben las skills o agentes globales. Para
+onboarding y despliegue aplica `docs/project-contracts.md`.

@@ -206,6 +206,19 @@ class DeliveryValidationTests(unittest.TestCase):
         data["repositories"][0]["integration_branch"] = "develop"
         self.assertTrue(any("must match" in error for error in validator.validate(data)))
 
+    def test_staging_may_be_the_declared_integration_branch(self) -> None:
+        data = active_v2()
+        data["repositories"][0]["integration_branch"] = "staging"
+        data["environments"]["integration"]["branch"] = "staging"
+        self.assertEqual([], validator.validate(data))
+
+    def test_production_cannot_share_the_integration_branch(self) -> None:
+        data = active_v2()
+        data["environments"]["production"]["branch"] = "dev"
+        self.assertTrue(
+            any("must be unique" in error for error in validator.validate(data))
+        )
+
     def test_planned_branch_disables_deploy(self) -> None:
         data = active_v2()
         data["environments"]["staging"].update(state="planned", deploy_enabled=True)

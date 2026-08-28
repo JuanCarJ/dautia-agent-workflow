@@ -29,7 +29,20 @@ python3 scripts/doctor.py --profile wsl-shared
 ```
 
 Reinicia Codex y Cursor. Cursor descubre las skills instaladas en
-`~/.codex/skills` y sus adaptadores de agentes en `~/.cursor/agents`.
+`~/.agents/skills`; Codex usa esa misma ruta. Los adaptadores de Cursor quedan
+en `~/.cursor/agents`.
+
+Cursor carga el `AGENTS.md` versionado de cada proyecto. Para conservar tambien
+el contrato global cuando abras un repositorio que todavia no tenga ese archivo,
+abre `Cursor Settings > Rules > User Rules` y pega una sola vez el contenido de:
+
+```text
+~/.config/dautia/cursor-user-rules.md
+```
+
+El instalador actualiza esa copia, pero no modifica ajustes internos de Cursor.
+Despues de actualizar el workflow, reemplaza las User Rules solo si el archivo
+cambio. `pstack` y cualquier Cursor Lab quedan fuera de este proceso.
 
 ## 3. Credenciales por host
 
@@ -60,3 +73,7 @@ git pull --ff-only
 python3 scripts/install.py --profile wsl-shared --apply
 python3 scripts/doctor.py --profile wsl-shared
 ```
+
+Si `doctor.py` termina sin `FAIL`, el runtime compartido esta sincronizado. Los
+`WARN` de herramientas opcionales solo bloquean el proyecto que realmente las
+necesite.

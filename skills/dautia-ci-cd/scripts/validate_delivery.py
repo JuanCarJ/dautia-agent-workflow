@@ -358,7 +358,19 @@ def validate_v2(contract: Any, repo: Path | None = None, require_active: bool = 
             errors,
         )
     if duplicates(branch_names):
-        errors.append("environment branch names must be unique")
+        integration_name = environments.get("integration", {}).get("branch")
+        staging_name = environments.get("staging", {}).get("branch")
+        production_name = environments.get("production", {}).get("branch")
+        staging_is_integration = (
+            integration_name == staging_name
+            and isinstance(production_name, str)
+            and production_name != integration_name
+            and branch_names.count(integration_name) == 2
+        )
+        if not staging_is_integration:
+            errors.append(
+                "environment branch names must be unique except when staging is the integration branch"
+            )
 
     integration_branch = environments.get("integration", {}).get("branch")
     for index, item in enumerate(repositories):
