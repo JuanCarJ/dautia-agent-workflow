@@ -1,0 +1,19 @@
+version: 1
+project:
+  id: project-id
+  topology: multi-repo
+repositories:
+  - id: governance
+    path: ../project-governance
+    role: governance
+    base_branch: main
+    allowed_flows:
+      - docs/* -> main
+  - id: app
+    path: ../project-app
+    role: application
+    base_branch: dev
+    allowed_flows:
+      - feature/* -> dev
+      - dev -> staging
+      - staging -> main

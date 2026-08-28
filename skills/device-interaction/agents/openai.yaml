@@ -1,0 +1,4 @@
+interface:
+  display_name: "Device Interaction"
+  short_description: "Verify focused mobile flows on device"
+  default_prompt: "Use $device-interaction to verify the affected mobile flow with proportional device evidence."

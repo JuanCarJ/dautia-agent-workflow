@@ -1,0 +1,4 @@
+interface:
+  display_name: "SideQuest Admin Access"
+  short_description: "Provision and verify SideQuest admin access"
+  default_prompt: "Use $sidequest-admin-access to create or verify this SideQuest admin user end to end."

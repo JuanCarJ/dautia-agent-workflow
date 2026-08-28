@@ -1,0 +1,4 @@
+interface:
+  display_name: "Windows WSL Dev and CI Ops"
+  short_description: "Operate private dev and CI workloads in WSL"
+  default_prompt: "Use $windows-wsl-ci-ops to preflight an explicitly selected project and dev or CI profile on private WSL infrastructure."

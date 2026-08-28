@@ -1,0 +1,6 @@
+interface:
+  display_name: "Landing Conversion Critic"
+  short_description: "Evidence-led landing and conversion critique"
+  default_prompt: "Use $vicky-davila to critique this commercial landing with evidence, verified product facts, and clearly labeled hypotheses."
+policy:
+  allow_implicit_invocation: false

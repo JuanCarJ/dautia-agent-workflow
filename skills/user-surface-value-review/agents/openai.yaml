@@ -1,0 +1,4 @@
+interface:
+  display_name: "User Surface Value Review"
+  short_description: "Valida si cada elemento visible aporta valor contextual"
+  default_prompt: "Usa $user-surface-value-review sobre la superficie cambiada. Evalua copy, metricas, componentes, estados y terminologia segun rol, tarea, dominio y comportamiento real. No premies minimalismo ni agregues una fase o gate."

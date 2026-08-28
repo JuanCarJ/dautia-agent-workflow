@@ -1,0 +1,4 @@
+interface:
+  display_name: "UI/UX Pro Max"
+  short_description: "Searchable UI/UX design rules, palettes, typography, and patterns"
+  default_prompt: "Use $ui-ux-pro-max to search the local design database and compare typography, palette, UX, style, or stack-specific options for this interface."

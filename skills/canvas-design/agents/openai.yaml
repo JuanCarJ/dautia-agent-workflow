@@ -1,0 +1,4 @@
+interface:
+  display_name: "Canvas Design"
+  short_description: "Create static visual artwork from a design philosophy"
+  default_prompt: "Use $canvas-design to create an original poster or static artwork by defining a concise visual philosophy and then expressing it as a polished artifact."

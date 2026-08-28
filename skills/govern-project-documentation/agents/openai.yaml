@@ -1,0 +1,4 @@
+interface:
+  display_name: "Govern Project Documentation"
+  short_description: "Govern canonical documentation topology"
+  default_prompt: "Use $govern-project-documentation once for an explicit documentation-governance question. Audit only the requested topology, canonical-source, traceability, or scaffolding delta; ordinary product docs do not require this skill."

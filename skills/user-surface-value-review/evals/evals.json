@@ -1,0 +1,20 @@
+{
+  "skill_name": "user-surface-value-review",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Acabamos de implementar un reporte comercial para la administradora de una tienda. La vista muestra cuatro tarjetas: Ventas $639.700, Pedidos aprobados 2, Ticket promedio $319.850 y Utilidad bruta $0. Las tres primeras comparan contra el periodo anterior y cada una incluye un parrafo que explica su formula. En utilidad aparece ademas 'Margen sin margen' y una alerta: '3 unidades sin costo interno. El margen del periodo esta incompleto'. Debajo, el titulo 'Listado comercial / Ventas aprobadas del periodo', un parrafo que explica todas las columnas y que las ventas en tienda no usan estados de envio, un recuadro separado con las fechas del periodo anterior y una tabla de ventas. Haz la revision posterior a la implementacion. No cambies codigo.",
+      "expected_output": "Debe conservar las metricas relevantes de reporte, detectar que utilidad desconocida no puede mostrarse como cero, conservar y volver accionable la alerta de costos, simplificar explicaciones redundantes y no recomendar minimalismo por cantidad de tarjetas."
+    },
+    {
+      "id": 2,
+      "prompt": "Terminamos la pantalla principal de venta fisica para una vendedora. Antes del buscador agregamos un hero que dice 'Controla tu operacion comercial desde una sola superficie', tarjetas con 20 categorias, 980 variantes activas y 4 canales habilitados, un badge 'Sincronizacion correcta', y dos parrafos que explican que primero debe buscar un producto y despues agregarlo al ticket. La misma pantalla tambien muestra una alerta de stock insuficiente cuando intenta vender mas unidades de las disponibles y ofrece volver a la cantidad maxima permitida. Haz la revision posterior a la implementacion. No cambies codigo.",
+      "expected_output": "Debe retirar o reubicar hero, conteos tecnicos, estado interno y explicacion obvia; mantener la alerta de stock y su recuperacion; justificarlo por la tarea de vender, no por una preferencia estetica."
+    },
+    {
+      "id": 3,
+      "prompt": "Implementamos una migracion versionada que agrega un indice PostgreSQL y ajustamos una consulta interna. No cambio ningun endpoint, copy, respuesta, pantalla ni estado observable. Haz la revision posterior a la implementacion. No cambies codigo.",
+      "expected_output": "Debe responder NOT_APPLICABLE de inmediato porque no existe un delta visible, sin inventar una auditoria de UI, copy o componentes."
+    }
+  ]
+}

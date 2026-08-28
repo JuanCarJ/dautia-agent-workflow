@@ -1,0 +1,4 @@
+interface:
+  display_name: "Gelotra Readonly Research"
+  short_description: "Document Gelotra safely in read-only mode"
+  default_prompt: "Use $gelotra-readonly-research to inspect Gelotra screens safely and document the workflow without changing production data."

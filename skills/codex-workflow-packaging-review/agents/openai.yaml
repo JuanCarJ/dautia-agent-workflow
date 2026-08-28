@@ -1,0 +1,4 @@
+interface:
+  display_name: "Workflow Packaging Review"
+  short_description: "Package repeated work without duplication"
+  default_prompt: "Use $codex-workflow-packaging-review to audit my recent work and create only high-confidence missing reusable assets."

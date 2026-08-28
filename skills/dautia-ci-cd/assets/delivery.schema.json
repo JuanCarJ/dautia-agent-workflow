@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dautia.local/schemas/delivery-v2.schema.json",
+  "title": "DautIA delivery contract v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "project",
+    "product_topology",
+    "repository_layout",
+    "configuration_status",
+    "production_enabled"
+  ],
+  "properties": {
+    "schema_version": {"const": 2},
+    "project": {"type": "string", "minLength": 1},
+    "product_topology": {"enum": ["single-codebase", "multi-codebase"]},
+    "repository_layout": {"enum": ["single-repo", "monorepo", "multi-repo"]},
+    "configuration_status": {"enum": ["active", "draft"]},
+    "production_enabled": {"type": "boolean"},
+    "activation_blocked_reason": {"type": "string", "minLength": 1},
+    "repositories": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/repository"}
+    },
+    "codebases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/codebase"}
+    },
+    "environments": {"$ref": "#/$defs/environments"},
+    "required_checks": {"$ref": "#/$defs/checks"},
+    "rollback_refs": {"$ref": "#/$defs/stringArray"}
+    ,
+    "provider_projects": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/providerProject"}
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"configuration_status": {"const": "draft"}},
+        "required": ["configuration_status"]
+      },
+      "then": {
+        "required": ["activation_blocked_reason"],
+        "properties": {"production_enabled": {"const": false}},
+        "not": {
+          "anyOf": [
+            {"required": ["repositories"]},
+            {"required": ["codebases"]},
+            {"required": ["environments"]},
+            {"required": ["required_checks"]},
+            {"required": ["rollback_refs"]},
+            {"required": ["provider_projects"]}
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"configuration_status": {"const": "active"}},
+        "required": ["configuration_status"]
+      },
+      "then": {
+        "required": [
+          "repositories",
+          "codebases",
+          "environments",
+          "required_checks",
+          "rollback_refs"
+        ],
+        "not": {"required": ["activation_blocked_reason"]}
+      }
+    },
+    {
+      "if": {
+        "properties": {"production_enabled": {"const": false}},
+        "required": ["production_enabled"]
+      },
+      "then": {
+        "properties": {
+          "environments": {
+            "properties": {
+              "production": {
+                "properties": {"deploy_enabled": {"const": false}}
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "stringArray": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path", "integration_branch"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "path": {"type": "string", "minLength": 1},
+        "integration_branch": {"type": "string", "minLength": 1}
+      }
+    },
+    "codebase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "repository", "path", "kind", "status", "delivery_target"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "repository": {"type": "string", "minLength": 1},
+        "path": {"type": "string", "minLength": 1},
+        "kind": {"type": "string", "minLength": 1},
+        "status": {"enum": ["active", "planned"]},
+        "delivery_target": {"type": "string", "minLength": 1}
+      }
+    },
+    "providerProject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "environment", "project_ref", "workdir"],
+      "properties": {
+        "provider": {"const": "supabase"},
+        "environment": {"enum": ["staging", "production"]},
+        "project_ref": {"type": "string", "pattern": "^[a-z]{20}$"},
+        "workdir": {
+          "type": "string",
+          "minLength": 1,
+          "not": {"pattern": "(^/|(^|/)\\.\\.(/|$))"}
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["branch", "state", "deploy_enabled", "target"],
+      "properties": {
+        "branch": {"type": "string", "minLength": 1},
+        "state": {"enum": ["observed", "planned"]},
+        "deploy_enabled": {"type": "boolean"},
+        "target": {"type": "string", "minLength": 1}
+      }
+    },
+    "environments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["integration", "staging", "production"],
+      "properties": {
+        "integration": {"$ref": "#/$defs/environment"},
+        "staging": {"$ref": "#/$defs/environment"},
+        "production": {"$ref": "#/$defs/environment"}
+      }
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["integration", "staging", "production"],
+      "properties": {
+        "integration": {"$ref": "#/$defs/checkArray"},
+        "staging": {"$ref": "#/$defs/checkArray"},
+        "production": {"$ref": "#/$defs/checkArray"}
+      }
+    },
+    "checkArray": {
+      "type": "array",
+      "minItems": 0,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    }
+  }
+}

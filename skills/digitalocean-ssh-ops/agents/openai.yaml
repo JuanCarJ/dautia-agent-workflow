@@ -1,0 +1,4 @@
+interface:
+  display_name: "DigitalOcean SSH Ops"
+  short_description: "Safe SSH deploys on servidor_do_1"
+  default_prompt: "Use $digitalocean-ssh-ops to deploy or validate a Docker service on servidor_do_1 safely."

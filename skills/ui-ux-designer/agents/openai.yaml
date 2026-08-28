@@ -1,0 +1,4 @@
+interface:
+  display_name: "UI/UX Designer"
+  short_description: "Critique usability, hierarchy, accessibility, and visual direction"
+  default_prompt: "Use $ui-ux-designer with a scope mode (FULL, SECTION, CODE, AI-UX, CONSULT) and authority mode (AUDIT or CHANGE). Judge visible information by role, task, domain, value and implemented behavior; do not optimize by component count. AUDIT returns the product delta without editing. CHANGE implements the approved delta in the declared integration branch."

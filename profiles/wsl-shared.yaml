@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "id": "wsl-shared",
+  "platform": "linux-wsl",
+  "harnesses": ["codex", "cursor"],
+  "capabilities": {
+    "ios_build_and_release": false,
+    "android": true,
+    "web_backend": true,
+    "provider_cli": true,
+    "shared_infrastructure": true
+  },
+  "codex_root": {
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "high"
+  },
+  "codex_agents": {
+    "code_explorer": ["gpt-5.6-terra", "high"],
+    "data_security": ["gpt-5.6-sol", "high"],
+    "decision_gate": ["gpt-5.6-sol", "xhigh"],
+    "documental": ["gpt-5.6-terra", "medium"],
+    "implementer": ["gpt-5.6-terra", "medium"],
+    "implementer_complex": ["gpt-5.6-sol", "high"],
+    "independent_reviewer": ["gpt-5.6-sol", "high"],
+    "product_discovery": ["gpt-5.6-sol", "high"],
+    "qa_android": ["gpt-5.6-sol", "high"],
+    "qa_e2e": ["gpt-5.6-sol", "high"],
+    "qa_ios": ["gpt-5.6-sol", "high"],
+    "qa_web": ["gpt-5.6-sol", "high"],
+    "release_operator": ["gpt-5.6-sol", "high"],
+    "ux_auditor": ["gpt-5.6-sol", "high"]
+  },
+  "cursor_agents": {
+    "model": "inherit",
+    "policy": "Models are selected in Cursor. A role may be remapped only after it passes the shared conformance cases."
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "skill_name": "apple-app-review-submission",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Prepara el paquete de App Review para una actualización iOS 1.4.2 (108). Solo añadimos un calendario de rachas en Inicio y corregimos un crash al primer arranque. El revisor entra con una cuenta demo y llega a ambas rutas en menos de un minuto. No envíes nada todavía.",
+      "expected_output": "A preflight package that separates public What's New from private review notes, recommends no video for the deterministic routine update, and stops before any external submission action.",
+      "files": [],
+      "expectations": [
+        "The result identifies the candidate as iOS 1.4.2 build 108 and does not claim it was submitted.",
+        "The result keeps What's New user-facing and App Review Notes reviewer-facing.",
+        "The attachment decision is explicitly video omitted because the route is short and reproducible; it does not recommend an optional just-in-case recording.",
+        "The result explicitly stops before external submission because the user requested preparation only."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Apple rechazó nuestra app social por Guideline 1.2. Ya implementamos aceptación de reglas, reporte de un mensaje, bloqueo del autor y desaparición inmediata del contenido. Para demostrarlo hacen falta dos cuentas y mensajes en vivo. Prepara la resubmission y dime si aquí sí necesitamos video; no pulses Submit for Review.",
+      "expected_output": "A rejection-focused preflight that treats the multi-user UGC safety flow as a justified video case, defines a focused recording and private notes, and preserves the submission authority boundary.",
+      "files": [],
+      "expectations": [
+        "The result marks the video as necessary and ties the decision to the multi-user non-obvious UGC safety flow.",
+        "The recording plan includes rules acceptance, report, block, and immediate content disappearance without exposing credentials or personal data.",
+        "UGC compliance details are placed in private App Review Notes rather than public What's New copy.",
+        "The result does not claim Apple acceptance and stops before Submit for Review."
+      ]
+    }
+  ]
+}

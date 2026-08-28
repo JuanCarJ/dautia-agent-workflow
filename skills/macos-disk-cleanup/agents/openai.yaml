@@ -1,0 +1,4 @@
+interface:
+  display_name: "macOS Disk Cleanup"
+  short_description: "Audit and reclaim Mac disk space safely"
+  default_prompt: "Use $macos-disk-cleanup to audit this Mac, protect named projects, and reclaim only explicitly authorized space."

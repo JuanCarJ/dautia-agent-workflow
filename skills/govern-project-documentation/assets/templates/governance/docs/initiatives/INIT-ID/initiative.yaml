@@ -1,0 +1,22 @@
+id: INIT-ID
+name: Initiative Name
+lifecycle: design
+authority: governance-repo
+canonical:
+  functional: functional-spec.md
+  architecture: architecture/overview.md
+  implementation_plan: implementation-plan.md
+  traceability: traceability.md
+  decisions: decision-log.md
+sources: []
+target_repositories: []
+open_decisions: []
+blockers: []
+implementation_entry_gate:
+  approved: false
+  criteria:
+    - functional scope approved
+    - architecture decisions accepted
+    - acceptance criteria testable
+    - data and security risks classified
+    - target repos and Gitflow confirmed

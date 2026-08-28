@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ryven Release Closeout"
+  short_description: "Reconcile Ryven release truth"
+  default_prompt: "Use $ryven-release-closeout once only for an explicit cross-layer Ryven release closeout, remote deploy, TestFlight/App Store action, or release-state audit. Do not trigger it for routine docs or isolated local tasks."

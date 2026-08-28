@@ -1,0 +1,4 @@
+interface:
+  display_name: "Siigo API Colombia Expert"
+  short_description: "Design and verify Siigo Colombia integrations"
+  default_prompt: "Use $siigo-api-colombia to design or resolve this Siigo Colombia integration from current official evidence, with server-side secrets, read-only defaults, and explicit business-write boundaries."

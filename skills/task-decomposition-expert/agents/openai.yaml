@@ -1,0 +1,7 @@
+interface:
+  display_name: "Task Decomposition Expert"
+  short_description: "Plan substantial frontend work"
+  default_prompt: "Decompose this substantial frontend increment only where needed into buildable views, states, shared components, dependencies, data boundaries, acceptance criteria, and implementation order."
+
+policy:
+  allow_implicit_invocation: true

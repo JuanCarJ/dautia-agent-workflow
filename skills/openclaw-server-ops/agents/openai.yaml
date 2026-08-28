@@ -1,0 +1,4 @@
+interface:
+  display_name: "OpenClaw Server Ops"
+  short_description: "Diagnose OpenClaw layers on servidor_do_1"
+  default_prompt: "Use $openclaw-server-ops with $digitalocean-ssh-ops to diagnose this OpenClaw issue on servidor_do_1 from live evidence."

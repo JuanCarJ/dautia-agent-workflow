@@ -1,0 +1,58 @@
+[
+  {
+    "query": "Vamos a crear hoy la solicitud de App Review para iOS 1.4.2 build 108. Prepara los campos y detente antes de Submit for Review.",
+    "should_trigger": true
+  },
+  {
+    "query": "Apple rechazó la 1.0.2 (75) por Guideline 1.2 y ya vamos a crear la resubmission con ese build. Organiza notas, cuentas y evidencia.",
+    "should_trigger": true
+  },
+  {
+    "query": "Crea el paquete con el que añadiremos Ryven 1.1 (82) a una nueva submission en App Store Connect.",
+    "should_trigger": true
+  },
+  {
+    "query": "We are about to create the App Review submission for macOS 3.2 build 410; prepare the reviewer path and metadata.",
+    "should_trigger": true
+  },
+  {
+    "query": "Voy a enviar el build 204 a revisión y necesito crear la solicitud en App Store Connect, pero no pulses el botón final todavía.",
+    "should_trigger": true
+  },
+  {
+    "query": "Creemos la solicitud de revisión para el hotfix 2.0.1 (19) y evaluemos dentro del paquete si procede expedited review.",
+    "should_trigger": true
+  },
+  {
+    "query": "¿Cuánto suele tardar Apple en revisar una app?",
+    "should_trigger": false
+  },
+  {
+    "query": "Mira si el build 108 ya terminó de procesar en TestFlight.",
+    "should_trigger": false
+  },
+  {
+    "query": "Redáctame solamente el What's New de esta versión, todavía no vamos a crear la solicitud.",
+    "should_trigger": false
+  },
+  {
+    "query": "Analiza este rechazo de Apple y dime qué significa; por ahora no vamos a reenviar.",
+    "should_trigger": false
+  },
+  {
+    "query": "Audita si el repositorio está listo para App Review, sin entrar a App Store Connect ni crear una submission.",
+    "should_trigger": false
+  },
+  {
+    "query": "¿Qué pide la Guideline 1.2 para apps con UGC?",
+    "should_trigger": false
+  },
+  {
+    "query": "Haz el cierre del release y separa el estado local, TestFlight y producción.",
+    "should_trigger": false
+  },
+  {
+    "query": "Revisa las App Review Notes que escribí, pero no estamos preparando ninguna solicitud todavía.",
+    "should_trigger": false
+  }
+]

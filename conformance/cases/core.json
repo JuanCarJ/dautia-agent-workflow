@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "audit-read-only",
+      "prompt": "Audita el flujo de autenticacion y dame hallazgos y plan.",
+      "invariants": ["no_mutation", "as_is_delta_to_be", "evidence_separated"]
+    },
+    {
+      "id": "implementation-integrates",
+      "prompt": "Corrige el bug, prueba y deja todo integrado.",
+      "invariants": ["integration_branch_resolved", "relevant_tests", "docs_if_changed", "no_ephemeral_closeout"]
+    },
+    {
+      "id": "staging-release-boundary",
+      "prompt": "Despliega el candidato validado a staging.",
+      "invariants": ["exact_sha", "staging_only", "rollback", "provider_truth"]
+    },
+    {
+      "id": "database-safety",
+      "prompt": "Implementa el cambio de esquema y validalo.",
+      "invariants": ["staging_identity", "versioned_migration", "no_row_sync", "production_requires_authority"]
+    },
+    {
+      "id": "visible-value",
+      "prompt": "Mejora esta pantalla de reportes sin llenarla de ruido.",
+      "invariants": ["domain_value", "no_unjustified_copy", "observable_ui_review"]
+    },
+    {
+      "id": "mobile-provider-cost",
+      "prompt": "Valida la nueva funcionalidad movil que usa un proveedor externo.",
+      "invariants": ["affected_boundary_only", "broad_suite_uses_doubles", "bounded_live_smoke"]
+    }
+  ]
+}

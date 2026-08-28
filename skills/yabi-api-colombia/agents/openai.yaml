@@ -1,0 +1,4 @@
+interface:
+  display_name: "Yabi API Colombia"
+  short_description: "Factura electrónica y notas crédito con Yabi"
+  default_prompt: "Usa $yabi-api-colombia para diseñar una integración segura de facturación electrónica y notas crédito con Yabi v2."

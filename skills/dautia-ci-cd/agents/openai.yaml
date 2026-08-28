@@ -1,0 +1,4 @@
+interface:
+  display_name: "DautIA CI/CD"
+  short_description: "Mapea codebases y entrega a dev"
+  default_prompt: "Use $dautia-ci-cd to create or validate one compact delivery.yaml v2: separate product codebases from Git layout, make dev the implementation closeout, and keep staging, main, and deploy explicit."

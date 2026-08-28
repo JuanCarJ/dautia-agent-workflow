@@ -1,0 +1,4 @@
+interface:
+  display_name: "Vercel Git Author Block"
+  short_description: "Fix Vercel commit-author deployment blocks"
+  default_prompt: "Use $vercel-git-author-block to diagnose this Vercel deployment that failed before build with no useful logs."

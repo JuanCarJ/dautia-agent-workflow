@@ -1,0 +1,59 @@
+{
+  "schema_version": 2,
+  "project": "dautia-agent-workflow",
+  "product_topology": "single-codebase",
+  "repository_layout": "single-repo",
+  "configuration_status": "active",
+  "production_enabled": false,
+  "repositories": [
+    {
+      "id": "workflow",
+      "path": ".",
+      "integration_branch": "main"
+    }
+  ],
+  "codebases": [
+    {
+      "id": "agent-workflow",
+      "repository": "workflow",
+      "path": ".",
+      "kind": "agent-contracts-skills-and-adapters",
+      "status": "active",
+      "delivery_target": "local-installations"
+    }
+  ],
+  "environments": {
+    "integration": {
+      "branch": "main",
+      "state": "observed",
+      "deploy_enabled": false,
+      "target": "versioned workflow source"
+    },
+    "staging": {
+      "branch": "staging",
+      "state": "planned",
+      "deploy_enabled": false,
+      "target": "not applicable"
+    },
+    "production": {
+      "branch": "production",
+      "state": "planned",
+      "deploy_enabled": false,
+      "target": "not applicable"
+    }
+  },
+  "required_checks": {
+    "integration": [
+      "python3 scripts/render_agents.py --check",
+      "python3 scripts/check_portability.py",
+      "python3 scripts/install.py --profile codex-macos --check",
+      "git diff --check"
+    ],
+    "staging": [],
+    "production": []
+  },
+  "rollback_refs": [
+    "previous origin/main SHA",
+    "local installer backup under ~/.config/dautia/workflow-backups"
+  ]
+}

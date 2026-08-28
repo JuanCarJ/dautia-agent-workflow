@@ -1,0 +1,4 @@
+interface:
+  display_name: "DautIA Project Cycle"
+  short_description: "Coordina sin imponer ceremonia"
+  default_prompt: "Carga $dautia-project-cycle una vez para este objetivo y elige el camino minimo que pruebe el resultado. Cero subagentes, cero telemetria y etapas omitidas son validos. En UI exige valor para el rol, tarea, dominio y funcionalidad sin agregar una fase. Prefiere CLI o MCP sobre GUI, usa computer-use al final e integra en la rama declarada sin promover salvo instruccion nueva."
