@@ -23,7 +23,7 @@ se conservan. No se reescriben solo para repetir reglas globales.
 
 | Producto | Estado | Para activarlo |
 | --- | --- | --- |
-| Habilis | Contrato `draft`, commit local en `dev`, sin remoto | Definir remoto, Supabase staging, ramas/ambientes y rollback verificable; despues publicar el contrato activo |
+| Habilis | Repositorio privado publicado en `JuanCarJ/habilis`; contrato `draft` | Provisionar Supabase staging, ramas/ambientes, targets de despliegue y rollback verificable; despues activar el contrato |
 
 ## Excluidos deliberadamente
 
