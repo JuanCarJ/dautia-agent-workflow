@@ -26,12 +26,22 @@ puede ser mecanica. Sol high no es seguro universal ni xhigh paso previo a Astra
 Falta de acceso, fixture o dispositivo requiere resolver evidencia, no esfuerzo.
 
 Astra pasa a Sol con decisiones/interfaces/invariantes/aceptacion resueltas y un
-bloque independiente cuyo ahorro compense el handoff. Astra conserva ejecucion
-breve o acoplada. En este host max_depth=1: un hijo Astra devuelve el bloque
+bloque independiente cuyo ahorro compense el handoff. systems_implementer conserva ejecucion
+breve o acoplada; systems_analyst permanece exclusivamente en lectura. En este host max_depth=1: un hijo Astra devuelve el bloque
 resuelto al principal para que este despache a Sol; no crea nietos. No añadir auditoria Astra final ni separar redaccion por defecto.
 El dueño conserva requisito -> cambio -> evidencia -> pendiente. Revisores reciben
 fuentes originales, candidato y pregunta de riesgo; no solo conclusiones del autor.
 Smokes conocidos se ejecutan directamente sin convocar especialistas de QA profundo.
+
+systems_analyst (Astra medium) devuelve a la raiz un plan ejecutable: decisiones
+resueltas y pendientes, bloques con limites de propiedad, dependencias y orden,
+aceptacion y pruebas focales por bloque. Puede recomendar roles/perfiles; solo
+la raiz los selecciona y despacha con el contexto resuelto. El analista no edita
+codigo, specs o archivos de plan, no integra ni crea o dirige subagentes. Puede
+inspeccionar fuentes y realizar comprobaciones no mutantes. Si la arquitectura
+sigue inseparable de implementar, informa esa frontera a la raiz; no asume
+el rol systems_implementer por iniciativa propia.
+Revision focal del contrato de este rol: 2026-09-07.
 
 ## Aplicacion real
 
