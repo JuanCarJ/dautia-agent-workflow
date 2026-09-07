@@ -15,19 +15,21 @@
     "reasoning_effort": "high"
   },
   "codex_agents": {
-    "code_explorer": ["gpt-5.6-terra", "high"],
+    "code_explorer": ["gpt-5.6-sol", "medium"],
     "data_security": ["gpt-5.6-sol", "high"],
-    "decision_gate": ["gpt-5.6-sol", "xhigh"],
-    "documental": ["gpt-5.6-terra", "medium"],
-    "implementer": ["gpt-5.6-terra", "medium"],
+    "decision_gate": ["gpt-5.6-sol", "high"],
+    "documental": ["gpt-5.6-sol", "medium"],
+    "implementer": ["gpt-5.6-sol", "medium"],
     "implementer_complex": ["gpt-5.6-sol", "high"],
     "independent_reviewer": ["gpt-5.6-sol", "high"],
-    "product_discovery": ["gpt-5.6-sol", "high"],
+    "product_discovery": ["gpt-6-astra", "low"],
     "qa_android": ["gpt-5.6-sol", "high"],
     "qa_e2e": ["gpt-5.6-sol", "high"],
     "qa_ios": ["gpt-5.6-sol", "high"],
     "qa_web": ["gpt-5.6-sol", "high"],
-    "release_operator": ["gpt-5.6-sol", "high"],
-    "ux_auditor": ["gpt-5.6-sol", "high"]
+    "release_operator": ["gpt-5.6-sol", "medium"],
+    "systems_analyst": ["gpt-6-astra", "medium"],
+    "systems_implementer": ["gpt-6-astra", "medium"],
+    "ux_auditor": ["gpt-6-astra", "low"]
   }
 }

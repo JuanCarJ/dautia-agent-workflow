@@ -86,8 +86,8 @@ def main() -> int:
         except (tomllib.TOMLDecodeError, UnicodeError) as exc:
             errors.append(f"invalid TOML {path.name}: {exc}")
 
-    if "Contrato v8" not in (ROOT / "AGENTS.md").read_text(encoding="utf-8"):
-        errors.append("AGENTS.md is not contract v8")
+    if "Contrato v13" not in (ROOT / "AGENTS.md").read_text(encoding="utf-8"):
+        errors.append("AGENTS.md is not contract v13")
 
     for script in (ROOT / "scripts").glob("*.py"):
         try:

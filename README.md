@@ -36,3 +36,20 @@ de cada producto.
 Las rutas de instalacion siguen los mecanismos documentados de cada harness:
 Codex macOS conserva su home actual; Codex y Cursor en WSL comparten Agent Skills
 desde `~/.agents/skills`. El repositorio no instala plugins de Cursor.
+
+## Routing v13
+
+El alcance `python3 scripts/install.py --profile codex-macos --scope routing --apply`
+actualiza AGENTS, dautia-project-cycle y los 16 roles con respaldo. El check del
+mismo alcance demuestra solo esos assets; `--scope all --check` sigue mostrando
+la deriva historica de otras skills. No aplicar todo para corregir routing.
+La raiz debe estar en Sol high en la configuracion local; el instalador no edita
+config.toml ni cambia sesiones activas. Cursor hereda su selector, no garantiza
+los perfiles de Codex. Otros hosts requieren instalacion y validacion propias.
+
+Descubrimiento focal usa Astra low; implementacion sustantiva resuelta usa Sol
+medium con bloque independiente y trabajo concurrente util. Sol high implementa
+cuando quedan decisiones tecnicas acopladas; Astra medium cuando la incertidumbre
+es transversal o arquitectura y ejecucion siguen inseparables. La revision del
+head final sigue siendo independiente. Esta asignacion es una politica operativa,
+no evidencia de superioridad o ahorro.

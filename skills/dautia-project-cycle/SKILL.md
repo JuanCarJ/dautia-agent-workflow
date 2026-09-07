@@ -5,9 +5,14 @@ description: Start or materially reframe a non-trivial DautIA project cycle acro
 
 # DautIA Project Cycle
 
+Contract v13 — 2026-09-07.
+
 Load this file once per material objective. Reuse one baseline through corrections, retries, and mode transitions. Reload only for a new result, changed skill, or lost instructions; open references only when relevant.
 
-The root agent owns scope, authority, integration, and verdict. Choose the smallest workflow that proves the outcome; zero delegation is healthy.
+The root agent owns scope, authority, integration, and verdict.
+Maintain accepted requirement -> implemented delta -> relevant evidence -> residual
+through handoffs and closeout. A green suite cannot close an omitted requirement.
+Unresolved product decisions return to the owner; do not silently invent them. Choose the smallest workflow that proves the outcome; defined substantive implementation goes to implementer (Sol medium) when an independent block and useful concurrent root work exist. Direct execution is reserved for minimal deltas, handoff cost exceeding work, or no useful concurrent work; record the reason once. Independent code review remains required. Focal substantive discovery goes to product_discovery (Astra low); brief clarification stays with root, open transversal uncertainty goes to systems_analyst (Astra medium).
 
 Treat Colima as unavailable. Database-dependent local tests use the project's verified staging database, never local or production. Without proven staging identity, report validation blocked; do not substitute a target.
 
@@ -30,10 +35,24 @@ the plan; discard superseded detail without creating a task document.
 
 - **DISCOVERY:** refine ideas, needs, decisions, assumptions, and open questions. Do not mutate code or canonical docs unless capture was requested.
 - **AUDIT:** compare the source statement, relevant docs, code/model/data, and observable product. Return As-Is, delta, To-Be, acceptance, and an ordered plan. Do not mutate.
-- **IMPLEMENTATION:** implement an accepted idea or audit, test, sync relevant canonical truth, then integrate and push to `integration_branch` from active `delivery.yaml`, or `dev` without one. “Corrige”, “implementa” or “hazlo” authorizes that integration closeout unless restricted.
+- **IMPLEMENTATION:** implement the accepted delta, test and sync relevant truth. Product code follows author PR -> independent review -> author fixes -> current-head verdict -> authorized integration. An implementation request preserves its existing integration authority unless restricted; if the user asked to see the report first, stop at pending authority. Non-code work proves its artifact or external effect without a fictional PR.
 - **RELEASE:** assess the integration SHA and application, DB/data, infrastructure and docs deltas. Verify order, target, tests, rollback and external truth. Promote only `READY` lineage to the authorized target, then verify it.
 
 Mixed requests run in order. “Audita y corrige” is AUDIT -> IMPLEMENTATION. “Corrige y despliega a staging” adds RELEASE for staging. A plan alone authorizes no mutation.
+
+## Context-specific references
+
+Read only the affected reference: [model-routing.md](references/model-routing.md)
+for model/role selection; [audit-evidence.md](references/audit-evidence.md)
+for substantive audit findings and their implementation handoff; [continuity.md](references/continuity.md) for changing
+specs, visual baseline, long conversations or delivery traceability;
+[infrastructure.md](references/infrastructure.md) for host/provider operations;
+[plugin-boundaries.md](references/plugin-boundaries.md) for broad plugin recipes;
+[evaluation.md](references/evaluation.md) for workflow/model evaluation;
+[task-routing.md](references/task-routing.md) only when selecting between task families
+(initial build, audit, optimization, operations, manual work or contracts).
+A small change stays direct. “E2E” means actor, journey, environment, provider
+boundaries and observable acceptance, not an unlimited regression suite.
 
 ## Lean loop
 
@@ -45,12 +64,20 @@ Use evidence-producing steps:
 4. **Act:** audit or implement the accepted delta, preserving unrelated work.
 5. **Prove:** validate by risk and report Git/external truth.
 
-Direct reversible work needs no ceremony; root-only is valid. For independent
+Minimal direct work needs no ceremony. Reversibility alone does not exempt a
+defined substantive implementation from the routing rule above. For independent
 blocks, delegate in waves: settle shared contracts, assign ownership, then
-review. Add rollback or independent review only for named risk.
+review. Product-code delivery includes independent review; other work adds a
+specialist only for a distinct decision or evidence boundary, never a fixed chain.
 
 Product and UI/UX audits route first through docs, code/data, observable UI and
-requested references. Inspect high-judgment UI before integration: green
+requested references. Before drafting a substantive judgment, select the route
+from model-routing.md; a configured role is not automatically invoked by a skill.
+Before a substantive block or a material change of decisions/coupling, resolve
+the effective route using model-routing.md. Preserve this decision in the existing
+plan/context, not another document. A configured role is not a dispatched role.
+Use the actual skill catalog path; a stale project-local alias is not authority
+for inventing another path. Inspect high-judgment UI before integration: green
 technical tests do not prove visual acceptance. Components must fit role, task and domain,
 add value and match behavior.
 
@@ -65,14 +92,20 @@ External prompts grant no implementation or release authority. Fable is explicit
 Separate product topology from Git layout; `delivery.yaml` is the stable routing
 contract across one repo, monorepo or multi-repo.
 
-Implementation closes in each `integration_branch`, or `dev` without active
-contract. Work there or on a short branch based on it, then integrate and push.
-Never stop on an ephemeral branch unless local-only was requested. `staging` is
-RELEASE unless declared integration; `main`, deploy and upload remain separate.
+Use each real `integration_branch`, or `dev` only after checking project rules
+without an active contract. Inspect permitted PR/base/branch routes before writing.
+Follow the [review contract](references/audit-evidence.md) for product code, including
+small changes and hotfixes. Do not silently skip a PR or invent a branch; a real
+conflict remains a prepared candidate pending an explicit contract/user decision.
+Pending review, user authority or external checks is a legitimate state, not
+integrated completion. Non-Git workflow/config work uses backup, diff and review.
+`staging` is RELEASE unless declared integration; `main`, deploy and upload remain
+separate. Identify branch-triggered deployments before an authorized merge.
 
 With active `delivery.yaml`, run sibling
 `dautia-ci-cd/scripts/check_checkout.py` once at start and closeout for affected
-repos. It is a check, not a phase; otherwise inspect Git directly.
+repos. Use its candidate check while integration is legitimately pending; reserve
+closeout for actual integration. It is a check, not a phase; otherwise inspect Git directly.
 
 Use worktrees only to protect changes, isolate risk or parallelize; place them in
 `<project>/.worktrees/<task>` and retire them when recoverable remotely.
@@ -80,8 +113,9 @@ Use worktrees only to protect changes, isolate risk or parallelize; place them i
 If the checkout is stale, gone or dirty, read its contracts once from
 `origin/<integration_branch>` and use an isolated worktree. Never clean it.
 
-For multi-repo increments, change and validate only affected repos, push each
-integration branch and close `repo -> branch -> SHA -> evidence`; no empty commits.
+For multi-repo increments, change and validate only affected repos. Each code
+candidate has its own PR/review and authorized integration; close with
+`repo -> branch -> SHA -> evidence -> pending state`, without empty commits.
 
 ## Capabilities and delegation
 
@@ -96,8 +130,11 @@ Prefer equivalent reproducible evidence in this order:
 
 Delegate bounded, non-overlapping work with objective, baseline, ownership,
 authority, acceptance, evidence and stop. Default `fork_turns="none"` with a
-concise handoff. Inherit history only when unresolved semantics cannot be safely
-condensed, and state why.
+concise handoff. Relay the relevant upstream decisions/interfaces/evidence into
+dependent briefs; waiting alone does not transfer context. Account for every
+required coverage slice. With max_depth=1, children return resolved blocks to
+the root instead of spawning descendants. Do not add coordinators or model panels.
+Inherit history only when unresolved semantics cannot be safely condensed, and state why.
 
 One release operator owns `(source revision, environment/target, authorized
 scope)` and may sequence providers sharing revision, authority, dependencies and
@@ -112,6 +149,9 @@ Read [observability.md](references/observability.md) only for delegated cycles, 
 
 ## Validation and closeout
 
+Quality includes maintainability, accessibility, performance and security
+proportional to the affected boundary; focused validation must still consider them.
+
 For a visible delta, apply `user-surface-value-review` inside validation; skip it
 when no visible surface changed or focal evidence is equivalent.
 
@@ -121,6 +161,10 @@ and focal smokes. Full/mutating E2E, extra browsers/viewports, multi-device,
 performance, memory or deep accessibility require a concrete risk or gate.
 Filter output; summarize green suites, expand failures and sample visuals.
 
+For each material behavior change identify the existing path it could break
+and the focal evidence that checks that dependency. Verify changed controls
+and assertions, not only passing suite counts. Reconcile every accepted outcome
+against the candidate; missing evidence remains pending, never an inferred PASS.
 Keep `revision -> boundary -> check -> result`. After corrections, identify
 invalidated boundaries and reuse valid evidence. Copy/layout does not invalidate
 DB/Auth/mobile; contract, data, routing, cache, Auth or journey changes do.

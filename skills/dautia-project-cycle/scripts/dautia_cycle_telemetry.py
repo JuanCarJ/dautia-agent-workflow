@@ -18,8 +18,8 @@ import tempfile
 from typing import Any
 
 
-SCHEMA_VERSION = 3
-SUPPORTED_SCHEMA_VERSIONS = {1, 2, SCHEMA_VERSION}
+SCHEMA_VERSION = 5
+SUPPORTED_SCHEMA_VERSIONS = {1, 2, 3, 4, SCHEMA_VERSION}
 SAFE_ID = re.compile(r"^[A-Za-z0-9._-]{1,80}$")
 UUID_LIKE = re.compile(r"^[A-Fa-f0-9-]{16,80}$")
 SKILL_PATH = re.compile(r"/([A-Za-z0-9._-]{1,80})/SKILL\.md(?:[\"'\\\s]|$)")
@@ -35,7 +35,18 @@ VISUAL_TOOL_METHODS = {
 }
 CLASSIFICATIONS = ("direct", "standard", "critical")
 WORKFLOW_MODES = ("discovery", "audit", "implementation", "release")
-DEV_CLOSEOUTS = ("verified", "local_only", "missing", "not_applicable")
+PENDING_INTEGRATION_CLOSEOUTS = (
+    "pending_pr",
+    "pending_review",
+    "pending_authority",
+)
+INTEGRATION_CLOSEOUTS = (
+    "verified",
+    *PENDING_INTEGRATION_CLOSEOUTS,
+    "local_only",
+    "missing",
+    "not_applicable",
+)
 OUTCOMES = (
     "accepted",
     "accepted_with_residuals",
@@ -65,6 +76,15 @@ REPLACEMENT_REASONS = (
 DOC_SYNC_STATES = ("yes", "no", "n-a")
 EXTERNAL_STATES = ("verified", "pending", "n-a")
 COMMIT_SHA = re.compile(r"^[A-Fa-f0-9]{7,64}$")
+GIT_BRANCH = re.compile(r"^(?!/)(?!.*(?:\.\.|//))[A-Za-z0-9._/-]{1,200}(?<!/)$")
+TOKEN_KEYS = (
+    "input_tokens",
+    "cached_input_tokens",
+    "cache_write_input_tokens",
+    "output_tokens",
+    "reasoning_output_tokens",
+    "total_tokens",
+)
 
 
 def utc_now() -> str:
@@ -165,23 +185,33 @@ def output_length(payload: dict[str, Any]) -> int:
     return len(output)
 
 
-def repo_closeout(value: str) -> tuple[str, str]:
-    project, separator, sha = value.partition("=")
-    if not separator:
-        raise argparse.ArgumentTypeError("must be PROJECT=DEV_SHA")
+def repo_closeout(value: str) -> tuple[str, str, str]:
+    project, separator, branch_and_sha = value.partition("=")
+    branch, branch_separator, sha = branch_and_sha.rpartition("@")
+    if not separator or not branch_separator:
+        raise argparse.ArgumentTypeError("must be PROJECT=INTEGRATION_BRANCH@SHA")
     try:
         project = safe_identifier(project, "repository closeout project")
     except ValueError as exc:
         raise argparse.ArgumentTypeError(str(exc)) from exc
+    if not GIT_BRANCH.fullmatch(branch):
+        raise argparse.ArgumentTypeError("INTEGRATION_BRANCH is not a safe Git branch name")
     if not COMMIT_SHA.fullmatch(sha):
-        raise argparse.ArgumentTypeError("DEV_SHA must be a 7-64 character hexadecimal commit")
-    return project, sha.lower()
+        raise argparse.ArgumentTypeError("SHA must be a 7-64 character hexadecimal commit")
+    return project, branch, sha.lower()
 
 
 def positive_float(value: str) -> float:
     parsed = float(value)
     if parsed <= 0:
         raise argparse.ArgumentTypeError("must be positive")
+    return parsed
+
+
+def nonnegative_float(value: str) -> float:
+    parsed = float(value)
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("must be non-negative")
     return parsed
 
 
@@ -351,12 +381,219 @@ def token_value(payload: dict[str, Any]) -> dict[str, int] | None:
     total = info.get("total_token_usage") if isinstance(info, dict) else None
     if not isinstance(total, dict):
         return None
-    return {
-        key: int(total.get(key, 0) or 0)
-        for key in (
-            "input_tokens", "cached_input_tokens", "output_tokens",
-            "reasoning_output_tokens", "total_tokens",
+    return {key: int(total.get(key, 0) or 0) for key in TOKEN_KEYS}
+
+
+def add_token_values(target: collections.Counter[str], values: dict[str, int]) -> None:
+    for key in TOKEN_KEYS:
+        target[key] += values.get(key, 0)
+
+
+def analyze_token_profiles(
+    session: dict[str, Any],
+    window_start: str | None,
+    window_end: str | None,
+) -> dict[str, Any]:
+    """Attribute observable cumulative-counter deltas to effective turn profiles.
+
+    Counter decreases start a new observable epoch. The post-reset snapshot is a
+    lower bound for that epoch; consumption between the prior snapshot and reset
+    remains unknown. A window boundary between counter snapshots is also kept as
+    an explicit gap instead of assigning the whole interval to the latest profile.
+    """
+    profiles: list[dict[str, Any]] = []
+    token_segments: list[dict[str, Any]] = []
+    segment_by_key: dict[tuple[int, int], dict[str, Any]] = {}
+    totals: collections.Counter[str] = collections.Counter()
+    current_model: str | None = None
+    current_effort: str | None = None
+    turn_index = 0
+    active_profile_index: int | None = None
+    counter_epoch = 0
+    previous_tokens: dict[str, int] | None = None
+    previous_token_timestamp: str | None = None
+    token_snapshots = 0
+    reset_count = 0
+    unknown_gaps = 0
+    missing_start_boundary = False
+    exact_start_boundary = window_start is None
+    token_at_window_end = window_end is None
+    completed_in_window = False
+    started_at = session_start(session)
+    if window_start is not None and started_at is not None and started_at >= window_start:
+        exact_start_boundary = True
+
+    def in_window(timestamp: str) -> bool:
+        return bool(
+            timestamp
+            and (window_start is None or timestamp >= window_start)
+            and (window_end is None or timestamp <= window_end)
         )
+
+    def ensure_profile(started_in_window: bool) -> int:
+        nonlocal active_profile_index
+        if active_profile_index is not None:
+            return active_profile_index
+        profiles.append(
+            {
+                "turn": max(turn_index, 1),
+                "model": current_model or "unknown",
+                "reasoning_effort": current_effort or "unknown",
+                "started_in_window": started_in_window,
+            }
+        )
+        active_profile_index = len(profiles) - 1
+        return active_profile_index
+
+    def add_delta(
+        delta: dict[str, int], reset_counters: list[str] | None = None
+    ) -> None:
+        profile_index = ensure_profile(False)
+        key = (profile_index, counter_epoch)
+        segment = segment_by_key.get(key)
+        if segment is None:
+            profile = profiles[profile_index]
+            segment = {
+                "turn": profile["turn"],
+                "model": profile["model"],
+                "reasoning_effort": profile["reasoning_effort"],
+                "counter_epoch": counter_epoch,
+                "coverage": "lower_bound_after_reset" if reset_counters else "observed_delta",
+                "token_snapshots": 0,
+                **{token_key: 0 for token_key in TOKEN_KEYS},
+            }
+            if reset_counters:
+                segment["reset_counters"] = reset_counters
+            segment_by_key[key] = segment
+            token_segments.append(segment)
+        segment["token_snapshots"] += 1
+        for token_key in TOKEN_KEYS:
+            segment[token_key] += delta[token_key]
+        add_token_values(totals, delta)
+
+    for timestamp, _, kind, payload in session["events"]:
+        before_window = bool(window_start is not None and timestamp and timestamp < window_start)
+        after_window = bool(window_end is not None and timestamp and timestamp > window_end)
+        if after_window:
+            continue
+
+        if kind == "turn_context":
+            turn_index += 1
+            if isinstance(payload.get("model"), str):
+                current_model = payload["model"]
+            if isinstance(payload.get("effort"), str):
+                current_effort = payload["effort"]
+            if before_window:
+                active_profile_index = None
+                continue
+            if in_window(timestamp):
+                active_profile_index = None
+                ensure_profile(True)
+            continue
+
+        if before_window:
+            if kind == "event_msg" and payload.get("type") == "token_count":
+                value = token_value(payload)
+                if value is not None:
+                    previous_tokens = value
+                    previous_token_timestamp = timestamp
+            continue
+        if not in_window(timestamp):
+            continue
+
+        if current_model is not None or current_effort is not None:
+            ensure_profile(False)
+        if kind != "event_msg":
+            continue
+        event_type = payload.get("type")
+        if event_type in ("task_complete", "turn_complete"):
+            completed_in_window = True
+        if event_type != "token_count":
+            continue
+        current_tokens = token_value(payload)
+        if current_tokens is None:
+            continue
+        token_snapshots += 1
+        if window_end is not None and timestamp == window_end:
+            token_at_window_end = True
+        if window_start is not None and timestamp == window_start:
+            previous_tokens = current_tokens
+            previous_token_timestamp = timestamp
+            exact_start_boundary = True
+            continue
+        if previous_tokens is None:
+            if exact_start_boundary:
+                add_delta(current_tokens)
+            else:
+                missing_start_boundary = True
+                unknown_gaps += 1
+            previous_tokens = current_tokens
+            previous_token_timestamp = timestamp
+            continue
+        if (
+            window_start is not None
+            and previous_token_timestamp is not None
+            and previous_token_timestamp < window_start
+            and not exact_start_boundary
+        ):
+            missing_start_boundary = True
+            unknown_gaps += 1
+            previous_tokens = current_tokens
+            previous_token_timestamp = timestamp
+            continue
+        reset_counters = [
+            key for key in TOKEN_KEYS if current_tokens[key] < previous_tokens[key]
+        ]
+        if reset_counters:
+            counter_epoch += 1
+            reset_count += 1
+            unknown_gaps += 1
+        delta = {
+            key: (
+                current_tokens[key]
+                if key in reset_counters
+                else current_tokens[key] - previous_tokens[key]
+            )
+            for key in TOKEN_KEYS
+        }
+        add_delta(delta, reset_counters or None)
+        previous_tokens = current_tokens
+        previous_token_timestamp = timestamp
+
+    end_boundary_partial = bool(
+        window_end is not None and not token_at_window_end and not completed_in_window
+    )
+    if end_boundary_partial:
+        unknown_gaps += 1
+    known_tokens = bool(token_segments) or (token_snapshots > 0 and exact_start_boundary)
+    partial = bool(reset_count or missing_start_boundary or end_boundary_partial)
+    if not known_tokens and (token_snapshots == 0 or partial):
+        coverage = "unavailable"
+    elif partial:
+        coverage = "partial_segmented"
+    elif window_start is not None or window_end is not None:
+        coverage = "exact_segmented"
+    else:
+        coverage = "segmented_cumulative"
+    return {
+        "profiles": profiles,
+        "token_segments": token_segments,
+        "token_usage": {key: totals[key] for key in TOKEN_KEYS},
+        "token_snapshots": token_snapshots,
+        "counter_resets": reset_count,
+        "unknown_gaps": unknown_gaps,
+        "values_known": known_tokens,
+        "coverage": coverage,
+        "start_boundary": (
+            "session_start_or_counter_snapshot"
+            if exact_start_boundary
+            else "between_counter_snapshots"
+        ),
+        "end_boundary": (
+            "counter_snapshot_or_completion"
+            if not end_boundary_partial
+            else "between_counter_snapshots"
+        ),
     }
 
 
@@ -365,10 +602,7 @@ def analyze_session(
     window_start: str | None = None, window_end: str | None = None,
 ) -> dict[str, Any]:
     events = session["events"]
-    model = None
-    effort = None
-    token_usage = None
-    token_key: tuple[str, int] | None = None
+    token_profiles = analyze_token_profiles(session, window_start, window_end)
     completed = False
     calls: set[str] = set()
     call_methods: dict[str, set[str]] = {}
@@ -382,8 +616,6 @@ def analyze_session(
     spawn_call_keys: set[str] = set()
     followup_call_keys: set[str] = set()
     timestamps: list[str] = []
-    baseline_tokens = None
-    baseline_seen = False
     polling_streak = 0
     max_polling_streak = 0
     repeated_polling = 0
@@ -415,25 +647,11 @@ def analyze_session(
         if timestamp and in_window:
             timestamps.append(timestamp)
         if window_start is not None and timestamp and timestamp < window_start:
-            if kind == "turn_context":
-                if isinstance(payload.get("model"), str):
-                    model = payload["model"]
-                if isinstance(payload.get("effort"), str):
-                    effort = payload["effort"]
-            elif kind == "event_msg" and payload.get("type") == "token_count":
-                value = token_value(payload)
-                if value is not None:
-                    baseline_tokens = value
-                    baseline_seen = True
             continue
         if not in_window:
             continue
         if kind == "turn_context":
             current_turn += 1
-            if isinstance(payload.get("model"), str):
-                model = payload["model"]
-            if isinstance(payload.get("effort"), str):
-                effort = payload["effort"]
         elif kind == "event_msg":
             event_type = payload.get("type")
             normalized_event = str(event_type or "").lower()
@@ -446,14 +664,7 @@ def analyze_session(
             if event_type != "token_count":
                 polling_streak = 0
                 polling_sequence = []
-            if event_type == "token_count":
-                total = token_value(payload)
-                if total is not None:
-                    key = (timestamp, line_number)
-                    if token_key is None or key >= token_key:
-                        token_key = key
-                        token_usage = total
-            elif event_type in ("task_complete", "turn_complete"):
+            if event_type in ("task_complete", "turn_complete"):
                 task_completions += 1
                 completed = True
         elif kind == "response_item":
@@ -579,9 +790,16 @@ def analyze_session(
             previous_wait_fingerprint = fingerprint
 
     return {
-        "model": model,
-        "effort": effort,
-        "token_usage": token_usage,
+        "profiles": token_profiles["profiles"],
+        "token_segments": token_profiles["token_segments"],
+        "segmented_token_usage": token_profiles["token_usage"],
+        "token_snapshots": token_profiles["token_snapshots"],
+        "token_counter_resets": token_profiles["counter_resets"],
+        "token_unknown_gaps": token_profiles["unknown_gaps"],
+        "token_values_known": token_profiles["values_known"],
+        "token_coverage": token_profiles["coverage"],
+        "token_start_boundary": token_profiles["start_boundary"],
+        "token_end_boundary": token_profiles["end_boundary"],
         "completed": completed,
         "tool_calls": len(calls),
         "tool_input_chars": tool_input_chars,
@@ -615,8 +833,6 @@ def analyze_session(
             for skill_name, turns in skill_turns.items()
             if len(turns) > 1
         },
-        "baseline_tokens": baseline_tokens,
-        "baseline_seen": baseline_seen,
         "start": min(timestamps) if timestamps else None,
         "end": max(timestamps) if timestamps else None,
         "malformed": session["malformed"],
@@ -659,7 +875,6 @@ def build_record(
     if cycle_skipped:
         warnings.append("session_parent_cycle_skipped")
     bounded = args.window_start is not None or args.window_end is not None
-    exact_token_window = args.window_start is not None
     def meta_started_in_window(session: dict[str, Any]) -> bool:
         metas = [timestamp for timestamp, _, kind, _ in session["events"] if kind == "session_meta" and timestamp]
         return bool(metas and (args.window_start is None or metas[0] >= args.window_start)
@@ -686,41 +901,55 @@ def build_record(
     role_counts: collections.Counter[str] = collections.Counter()
     model_counts: collections.Counter[str] = collections.Counter()
     effort_counts: collections.Counter[str] = collections.Counter()
+    model_effort_counts: collections.Counter[str] = collections.Counter()
+    execution_profiles: list[dict[str, Any]] = []
+    token_segments: list[dict[str, Any]] = []
     for index, (session, analysis) in enumerate(zip(selected, analyses)):
         role = "root" if index == 0 else session["meta"].get("agent_role")
         add_counter(role_counts, role if isinstance(role, str) else None)
-        add_counter(model_counts, analysis["model"])
-        add_counter(effort_counts, analysis["effort"])
+        session_kind = "root" if index == 0 else "child"
+        for profile in analysis["profiles"]:
+            model_counts[profile["model"]] += 1
+            effort_counts[profile["reasoning_effort"]] += 1
+            model_effort_counts[
+                f'{profile["model"]}|{profile["reasoning_effort"]}'
+            ] += 1
+            execution_profiles.append(
+                {
+                    "session_kind": session_kind,
+                    "session_ordinal": index,
+                    **profile,
+                }
+            )
+        for segment in analysis["token_segments"]:
+            token_segments.append(
+                {
+                    "session_kind": session_kind,
+                    "session_ordinal": index,
+                    **segment,
+                }
+            )
 
     token_totals: collections.Counter[str] = collections.Counter()
-    missing_tokens = 0
-    invalid_window_tokens = False
-    for session, analysis in zip(selected, analyses):
-        if analysis["token_usage"] is None:
-            missing_tokens += 1
-            continue
-        usage = analysis["token_usage"]
-        if bounded and args.window_start is not None:
-            if analysis["baseline_seen"]:
-                baseline = analysis["baseline_tokens"]
-            elif meta_started_in_window(session):
-                baseline = {key: 0 for key in usage}
-            else:
-                warnings.append("missing_window_token_baseline")
-                invalid_window_tokens = True
-                continue
-            delta = {key: usage[key] - baseline[key] for key in usage}
-            if any(value < 0 for value in delta.values()):
-                warnings.append("window_token_counter_reset")
-                invalid_window_tokens = True
-                continue
-            token_totals.update(delta)
-        else:
-            token_totals.update(usage)
+    missing_tokens = sum(analysis["token_snapshots"] == 0 for analysis in analyses)
+    counter_resets = sum(analysis["token_counter_resets"] for analysis in analyses)
+    token_unknown_gaps = sum(analysis["token_unknown_gaps"] for analysis in analyses)
+    for analysis in analyses:
+        add_token_values(token_totals, analysis["segmented_token_usage"])
     if missing_tokens:
         warnings.append("missing_token_count")
-        if exact_token_window:
-            invalid_window_tokens = True
+    if counter_resets:
+        warnings.append("token_counter_reset_segmented")
+    if any(
+        analysis["token_start_boundary"] == "between_counter_snapshots"
+        for analysis in analyses
+    ):
+        warnings.append("window_start_between_token_snapshots")
+    if any(
+        analysis["token_end_boundary"] == "between_counter_snapshots"
+        for analysis in analyses
+    ):
+        warnings.append("window_end_between_token_snapshots")
 
     root_spawns = analyses[0]["spawns"]
     spawns = [spawn for analysis in analyses for spawn in analysis["spawns"]]
@@ -780,10 +1009,22 @@ def build_record(
         and plan_updates_per_milestone is not None
         and plan_updates_per_milestone > plan_update_alert_ratio
     )
-    repo_closeouts = [
-        {"project": project, "dev_sha": sha}
-        for project, sha in getattr(args, "repo_closeout", [])
-    ]
+    integration_closeout = getattr(args, "integration_closeout", None)
+    default_integration_branch = getattr(args, "integration_branch", None)
+    repo_closeouts = []
+    missing_repo_branches = 0
+    for closeout in getattr(args, "repo_closeout", []):
+        if len(closeout) == 3:
+            project, branch, sha = closeout
+        else:
+            project, sha = closeout
+            branch = default_integration_branch
+        evidence = {"project": project, "integration_sha": sha}
+        if branch is not None:
+            evidence["integration_branch"] = branch
+        else:
+            missing_repo_branches += 1
+        repo_closeouts.append(evidence)
     release_operator_sessions = role_counts["release_operator"]
     release_tuple_complete = bool(
         bounded and args.project_slug and args.baseline and args.release_target
@@ -816,9 +1057,11 @@ def build_record(
         "objective_id": args.objective_id,
         "workflow_mode": args.workflow_mode,
         "project_slug": args.project_slug,
+        "host_id": getattr(args, "host_id", None),
         "classification": args.classification,
         "outcome": args.outcome,
-        "dev_closeout": args.dev_closeout,
+        "integration_closeout": integration_closeout,
+        "integration_branch": default_integration_branch,
         "release_target": args.release_target,
         "docs_sync": getattr(args, "docs_sync", None),
         "external_state": getattr(args, "external_state", None),
@@ -828,6 +1071,21 @@ def build_record(
     }
     for field in SEMANTIC_COUNTERS:
         semantic[field] = getattr(args, field)
+    outcome_metrics: dict[str, Any] = {}
+    acceptance_at_first_pass = getattr(args, "acceptance_at_first_pass", None)
+    if acceptance_at_first_pass is not None:
+        outcome_metrics["acceptance_at_first_pass"] = acceptance_at_first_pass == "yes"
+    human_corrections = getattr(args, "human_corrections", None)
+    if human_corrections is not None:
+        outcome_metrics["human_corrections"] = human_corrections
+    human_intervention_minutes = getattr(args, "human_intervention_minutes", None)
+    if human_intervention_minutes is not None:
+        outcome_metrics["human_intervention_minutes"] = human_intervention_minutes
+    if outcome_metrics:
+        semantic["outcome_metrics"] = {
+            "source": "operator_supplied",
+            **outcome_metrics,
+        }
 
     snapshot_end = max(ends) if ends else None
     contract_changed_at = getattr(args, "contract_changed_at", None)
@@ -846,38 +1104,76 @@ def build_record(
     else:
         contract_state = "unknown"
     snapshot_ref = snapshot_reference(args.snapshot_kind, args.sequence)
-    if invalid_window_tokens:
-        token_coverage = "unavailable"
-    elif exact_token_window:
-        token_coverage = "exact_cumulative_delta"
-    elif include_unbounded_tokens:
-        token_coverage = "partial_cumulative_totals" if missing_tokens else "cumulative_totals"
-    else:
+    coverage_values = {analysis["token_coverage"] for analysis in analyses}
+    known_segmented_tokens = any(analysis["token_values_known"] for analysis in analyses)
+    if not bounded and not include_unbounded_tokens:
         token_coverage = "cumulative_totals_suppressed"
         warnings.append("unbounded_token_totals_suppressed")
+    elif "unavailable" in coverage_values:
+        token_coverage = "partial_segmented" if known_segmented_tokens else "unavailable"
+    elif "partial_segmented" in coverage_values:
+        token_coverage = "partial_segmented"
+    elif bounded:
+        token_coverage = "exact_segmented"
+    elif include_unbounded_tokens:
+        token_coverage = "segmented_cumulative"
+    else:
+        token_coverage = "segmented_cumulative"
     tokens = {
-        "semantics": "processed_session_telemetry_not_billing",
+        "semantics": "processed_session_telemetry_not_billing_or_cost",
         "mode": "bounded" if bounded else "full_session",
         "coverage": token_coverage,
+        "attribution_basis": "turn_context_model_effort_and_counter_epoch",
+        "counter_resets": counter_resets,
+        "unknown_gaps": token_unknown_gaps,
     }
-    if not invalid_window_tokens and (exact_token_window or include_unbounded_tokens):
+    if (bounded or include_unbounded_tokens) and known_segmented_tokens:
+        profile_totals: dict[tuple[str, str], collections.Counter[str]] = {}
+        profile_turns: dict[tuple[str, str], set[tuple[int, int]]] = collections.defaultdict(set)
+        for profile in execution_profiles:
+            key = (profile["model"], profile["reasoning_effort"])
+            profile_turns[key].add((profile["session_ordinal"], profile["turn"]))
+        for segment in token_segments:
+            key = (segment["model"], segment["reasoning_effort"])
+            profile_totals.setdefault(key, collections.Counter())
+            add_token_values(profile_totals[key], segment)
+        by_model_effort = [
+            {
+                "model": model,
+                "reasoning_effort": effort,
+                "turns": len(profile_turns[(model, effort)]),
+                **{
+                    key: profile_totals.get((model, effort), collections.Counter())[key]
+                    for key in TOKEN_KEYS
+                },
+            }
+            for model, effort in sorted(profile_turns)
+        ]
         tokens = {
-            **{key: token_totals[key] for key in (
-                "input_tokens", "cached_input_tokens", "output_tokens",
-                "reasoning_output_tokens", "total_tokens",
-            )},
+            **{key: token_totals[key] for key in TOKEN_KEYS},
             **tokens,
+            "segments": token_segments,
+            "by_model_effort": by_model_effort,
         }
     if args.workflow_mode is None or args.objective_id is None:
         warnings.append("objective_or_workflow_mode_missing")
-    if args.workflow_mode == "implementation" and args.dev_closeout in (None, "missing"):
-        warnings.append("implementation_dev_closeout_missing")
+    if args.workflow_mode == "implementation" and integration_closeout in (None, "missing"):
+        warnings.append("implementation_integration_closeout_missing")
     if (
         args.workflow_mode == "implementation"
-        and args.dev_closeout == "verified"
+        and integration_closeout in PENDING_INTEGRATION_CLOSEOUTS
+    ):
+        warnings.append("implementation_candidate_pending")
+        if args.snapshot_kind == "final" and args.outcome in {"accepted", "released_verified"}:
+            warnings.append("pending_candidate_with_terminal_outcome")
+    if (
+        args.workflow_mode == "implementation"
+        and integration_closeout == "verified"
         and not repo_closeouts
     ):
-        warnings.append("verified_dev_closeout_without_repository_evidence")
+        warnings.append("verified_integration_closeout_without_repository_evidence")
+    if missing_repo_branches:
+        warnings.append("repository_closeout_integration_branch_missing")
     if args.workflow_mode == "release" and args.release_target is None:
         warnings.append("release_target_missing")
     if release_operator_reuse_alert:
@@ -888,7 +1184,9 @@ def build_record(
         warnings.append("large_text_tool_output_in_context")
     if contract_state == "stale_contract":
         warnings.append("stale_workflow_contract")
-    if analyses[0]["effort"] == "xhigh" and not xhigh_evidence:
+    if any(
+        profile["reasoning_effort"] == "xhigh" for profile in execution_profiles
+    ) and not xhigh_evidence:
         warnings.append("xhigh_without_evaluation_evidence")
     if not bounded and user_turns > 1:
         warnings.append("unbounded_multi_turn_scope")
@@ -927,6 +1225,10 @@ def build_record(
             ),
         },
         "semantic_summary": semantic,
+        "execution_profiles": {
+            "basis": "effective_turn_contexts_with_carried_window_context",
+            "segments": execution_profiles,
+        },
         "contract": {
             "version": getattr(args, "contract_version", None),
             "changed_at": contract_changed_at,
@@ -943,9 +1245,11 @@ def build_record(
             "malformed_lines_skipped": sum(analysis["malformed"] for analysis in analyses),
         },
         "distributions": {
+            "profile_basis": "turn_segments",
             "roles": dict(sorted(role_counts.items())),
             "models": dict(sorted(model_counts.items())),
             "reasoning_efforts": dict(sorted(effort_counts.items())),
+            "model_effort": dict(sorted(model_effort_counts.items())),
             "fork_turns": dict(sorted(fork_counts.items())),
         },
         "spawns": {
@@ -1189,7 +1493,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--workflow-mode", choices=WORKFLOW_MODES)
     parser.add_argument("--classification", choices=CLASSIFICATIONS)
     parser.add_argument("--outcome", choices=OUTCOMES)
-    parser.add_argument("--dev-closeout", choices=DEV_CLOSEOUTS)
+    parser.add_argument(
+        "--integration-closeout",
+        dest="integration_closeout",
+        choices=INTEGRATION_CLOSEOUTS,
+        help="implementation closeout against the project's effective integration branch",
+    )
+    parser.add_argument(
+        "--integration-branch",
+        help="effective integration branch for a single-repository closeout",
+    )
+    parser.add_argument("--host-id", help="privacy-safe operator label for the host being measured")
     parser.add_argument("--release-target")
     parser.add_argument(
         "--contract-version",
@@ -1205,11 +1519,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="append",
         default=[],
         type=repo_closeout,
-        metavar="PROJECT=DEV_SHA",
-        help="repeat for each affected repository integrated and pushed to dev",
+        metavar="PROJECT=INTEGRATION_BRANCH@SHA",
+        help="repeat for each affected repository integrated and pushed to its effective branch",
     )
     parser.add_argument("--docs-sync", choices=DOC_SYNC_STATES)
     parser.add_argument("--external-state", choices=EXTERNAL_STATES)
+    parser.add_argument("--acceptance-at-first-pass", choices=("yes", "no"))
+    parser.add_argument("--human-corrections", type=nonnegative)
+    parser.add_argument("--human-intervention-minutes", type=nonnegative_float)
     parser.add_argument("--plan-milestones", type=positive)
     parser.add_argument("--plan-update-alert-ratio", type=positive_float, default=2.0)
     parser.add_argument(
@@ -1225,7 +1542,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--window-end", type=iso_timestamp)
     parser.add_argument(
         "--include-unbounded-tokens", action="store_true",
-        help="include cumulative token totals when no exact window baseline exists",
+        help="include segmented cumulative token telemetry for an unbounded session",
     )
     parser.add_argument("--wait-timeout-alert-ratio", type=ratio, default=0.5)
     parser.add_argument("--duplicate-prevented", type=nonnegative)
@@ -1242,10 +1559,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         args.root_thread_id = args.root_thread_ids[0]
         if args.project_slug is not None:
             args.project_slug = safe_identifier(args.project_slug, "project-slug")
+        if args.host_id is not None:
+            args.host_id = safe_identifier(args.host_id, "host-id")
         if args.objective_id is not None:
             args.objective_id = safe_identifier(args.objective_id, "objective-id")
         if args.release_target is not None:
             args.release_target = safe_identifier(args.release_target, "release-target")
+        if args.integration_branch is not None and not GIT_BRANCH.fullmatch(args.integration_branch):
+            raise ValueError("integration-branch is not a safe Git branch name")
         if args.contract_version is not None:
             args.contract_version = safe_identifier(args.contract_version, "contract-version")
         if args.baseline is not None:

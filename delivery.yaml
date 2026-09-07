@@ -46,7 +46,7 @@
     "integration": [
       "python3 scripts/render_agents.py --check",
       "python3 scripts/check_portability.py",
-      "python3 scripts/install.py --profile codex-macos --check",
+      "python3 scripts/install.py --profile codex-macos --scope routing --check",
       "git diff --check"
     ],
     "staging": [],

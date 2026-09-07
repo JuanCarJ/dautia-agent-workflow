@@ -57,11 +57,16 @@ class TelemetryTests(unittest.TestCase):
             workflow_mode="audit",
             classification="standard",
             outcome="accepted",
-            dev_closeout="not_applicable",
+            integration_closeout="not_applicable",
+            integration_branch=None,
+            host_id=None,
             release_target=None,
             repo_closeout=[],
             docs_sync="n-a",
             external_state="n-a",
+            acceptance_at_first_pass=None,
+            human_corrections=None,
+            human_intervention_minutes=None,
             plan_milestones=None,
             plan_update_alert_ratio=2.0,
             xhigh_evidence=False,
@@ -378,12 +383,12 @@ class TelemetryTests(unittest.TestCase):
         args.window_start = "2026-01-01T00:00:06Z"
         args.window_end = "2026-01-01T00:01:02Z"
         record = telemetry.build_record(args)
-        self.assertEqual(record["tokens"]["total_tokens"], 16)
-        self.assertEqual(record["window"]["coverage"], "exact_cumulative_delta")
+        self.assertEqual(record["tokens"]["total_tokens"], 4)
+        self.assertEqual(record["window"]["coverage"], "exact_segmented")
         self.assertEqual(record["distributions"]["models"], {"gpt-5.6-sol": 2})
         self.assertEqual(record["coordination"]["successful_child_sessions"], 1)
 
-    def test_window_missing_baseline_and_reset_omit_aggregate_tokens(self):
+    def test_window_missing_baseline_and_reset_are_explicit(self):
         self.write_session("root", [
             event("2026-01-01T00:00:00Z", "session_meta", {"id": ROOT}),
             event("2026-01-01T00:00:02Z", "event_msg", {"type": "token_count", "info": {"total_token_usage": {"total_tokens": 9}}}),
@@ -392,17 +397,162 @@ class TelemetryTests(unittest.TestCase):
         args.window_start = "2026-01-01T00:00:01Z"
         record = telemetry.build_record(args)
         self.assertNotIn("total_tokens", record["tokens"])
-        self.assertIn("missing_window_token_baseline", record["warnings"])
+        self.assertEqual(record["tokens"]["coverage"], "unavailable")
+        self.assertIn("window_start_between_token_snapshots", record["warnings"])
 
         root = self.sessions / "root.jsonl"
         root.write_text("\n".join(json.dumps(item) for item in [
             event("2026-01-01T00:00:00Z", "session_meta", {"id": ROOT}),
-            event("2026-01-01T00:00:00Z", "event_msg", {"type": "token_count", "info": {"total_token_usage": {"total_tokens": 10}}}),
+            event("2026-01-01T00:00:01Z", "event_msg", {"type": "token_count", "info": {"total_token_usage": {"total_tokens": 10}}}),
             event("2026-01-01T00:00:02Z", "event_msg", {"type": "token_count", "info": {"total_token_usage": {"total_tokens": 2}}}),
         ]) + "\n", encoding="utf-8")
         record = telemetry.build_record(args)
-        self.assertNotIn("total_tokens", record["tokens"])
-        self.assertIn("window_token_counter_reset", record["warnings"])
+        self.assertEqual(record["tokens"]["total_tokens"], 2)
+        self.assertEqual(record["tokens"]["counter_resets"], 1)
+        self.assertEqual(record["tokens"]["coverage"], "partial_segmented")
+        self.assertIn("token_counter_reset_segmented", record["warnings"])
+
+    def test_historical_image_rollout_profiles_remove_latest_model_bias(self):
+        high_end = {
+            "input_tokens": 8_534_920,
+            "cached_input_tokens": 8_322_816,
+            "output_tokens": 17_423,
+            "reasoning_output_tokens": 6_833,
+            "total_tokens": 8_552_343,
+        }
+        final = {
+            "input_tokens": 12_674_277,
+            "cached_input_tokens": 12_262_400,
+            "output_tokens": 22_756,
+            "reasoning_output_tokens": 7_829,
+            "total_tokens": 12_697_033,
+        }
+        records = [event("2026-09-05T00:00:00Z", "session_meta", {"id": ROOT})]
+        for turn in range(1, 7):
+            usage = {key: value * turn // 6 for key, value in high_end.items()}
+            records.extend([
+                event(f"2026-09-05T00:00:{turn * 2 - 1:02d}Z", "turn_context", {
+                    "model": "gpt-6-astra", "effort": "high", "summary": SECRET,
+                }),
+                event(f"2026-09-05T00:00:{turn * 2:02d}Z", "event_msg", {
+                    "type": "token_count", "info": {"total_token_usage": usage},
+                }),
+            ])
+        for offset in range(1, 6):
+            usage = {
+                key: high_end[key] + (final[key] - high_end[key]) * offset // 5
+                for key in high_end
+            }
+            records.extend([
+                event(f"2026-09-05T00:00:{offset * 2 + 11:02d}Z", "turn_context", {
+                    "model": "gpt-6-astra", "effort": "medium",
+                }),
+                event(f"2026-09-05T00:00:{offset * 2 + 12:02d}Z", "event_msg", {
+                    "type": "token_count", "info": {"total_token_usage": usage},
+                }),
+            ])
+        self.write_session("root", records)
+
+        record = telemetry.build_record(self.args())
+        self.assertEqual(record["distributions"]["model_effort"], {
+            "gpt-6-astra|high": 6,
+            "gpt-6-astra|medium": 5,
+        })
+        profiles = {
+            item["reasoning_effort"]: item
+            for item in record["tokens"]["by_model_effort"]
+        }
+        self.assertEqual(profiles["high"]["total_tokens"], 8_552_343)
+        self.assertEqual(profiles["medium"]["total_tokens"], 4_144_690)
+        self.assertEqual(record["tokens"]["total_tokens"], 12_697_033)
+        self.assertEqual(record["tokens"]["semantics"], "processed_session_telemetry_not_billing_or_cost")
+        self.assertNotIn(SECRET, json.dumps(record))
+
+    def test_counter_reset_keeps_observable_lower_bound_by_profile(self):
+        self.write_session("root", [
+            event("2026-01-01T00:00:00Z", "session_meta", {"id": ROOT}),
+            event("2026-01-01T00:00:01Z", "turn_context", {
+                "model": "gpt-5.6-sol", "effort": "high",
+            }),
+            event("2026-01-01T00:00:02Z", "event_msg", {
+                "type": "token_count", "info": {"total_token_usage": {"total_tokens": 10}},
+            }),
+            event("2026-01-01T00:00:03Z", "turn_context", {
+                "model": "gpt-5.6-sol", "effort": "medium",
+            }),
+            event("2026-01-01T00:00:04Z", "event_msg", {
+                "type": "token_count", "info": {"total_token_usage": {"total_tokens": 4}},
+            }),
+            event("2026-01-01T00:00:05Z", "event_msg", {
+                "type": "token_count", "info": {"total_token_usage": {"total_tokens": 8}},
+            }),
+        ])
+        args = self.args()
+        args.window_start = "2026-01-01T00:00:00Z"
+        args.window_end = "2026-01-01T00:00:05Z"
+        record = telemetry.build_record(args)
+        profiles = {
+            item["reasoning_effort"]: item["total_tokens"]
+            for item in record["tokens"]["by_model_effort"]
+        }
+        self.assertEqual(profiles, {"high": 10, "medium": 8})
+        self.assertEqual(record["tokens"]["total_tokens"], 18)
+        self.assertEqual(record["tokens"]["counter_resets"], 1)
+        self.assertEqual(record["tokens"]["unknown_gaps"], 1)
+        self.assertEqual(record["tokens"]["coverage"], "partial_segmented")
+        self.assertTrue(any(
+            segment["coverage"] == "lower_bound_after_reset"
+            for segment in record["tokens"]["segments"]
+        ))
+
+    def test_partial_window_skips_cross_boundary_delta(self):
+        self.write_session("root", [
+            event("2026-01-01T00:00:00Z", "session_meta", {"id": ROOT}),
+            event("2026-01-01T00:00:01Z", "turn_context", {
+                "model": "gpt-5.6-sol", "effort": "high",
+            }),
+            event("2026-01-01T00:00:02Z", "event_msg", {
+                "type": "token_count", "info": {"total_token_usage": {"total_tokens": 10}},
+            }),
+            event("2026-01-01T00:00:04Z", "turn_context", {
+                "model": "gpt-5.6-sol", "effort": "medium",
+            }),
+            event("2026-01-01T00:00:05Z", "event_msg", {
+                "type": "token_count", "info": {"total_token_usage": {"total_tokens": 20}},
+            }),
+            event("2026-01-01T00:00:06Z", "event_msg", {
+                "type": "token_count", "info": {"total_token_usage": {"total_tokens": 30}},
+            }),
+        ])
+        args = self.args()
+        args.window_start = "2026-01-01T00:00:03Z"
+        args.window_end = "2026-01-01T00:00:06Z"
+        record = telemetry.build_record(args)
+        self.assertEqual(record["tokens"]["total_tokens"], 10)
+        self.assertEqual(record["tokens"]["coverage"], "partial_segmented")
+        self.assertEqual(record["distributions"]["model_effort"], {
+            "gpt-5.6-sol|medium": 1,
+        })
+        self.assertIn("window_start_between_token_snapshots", record["warnings"])
+
+    def test_outcome_metrics_and_host_are_emitted_only_when_supplied(self):
+        self.fixtures()
+        args = self.args()
+        record = telemetry.build_record(args)
+        self.assertNotIn("outcome_metrics", record["semantic_summary"])
+
+        args.acceptance_at_first_pass = "no"
+        args.human_corrections = 2
+        args.human_intervention_minutes = 12.5
+        args.host_id = "windows-wsl"
+        measured = telemetry.build_record(args)
+        self.assertEqual(measured["semantic_summary"]["host_id"], "windows-wsl")
+        self.assertEqual(measured["semantic_summary"]["outcome_metrics"], {
+            "source": "operator_supplied",
+            "acceptance_at_first_pass": False,
+            "human_corrections": 2,
+            "human_intervention_minutes": 12.5,
+        })
 
     def test_polling_alert_and_structural_reset(self):
         self.write_session("root", [
@@ -446,7 +596,7 @@ class TelemetryTests(unittest.TestCase):
         ])
         args = self.args()
         args.workflow_mode = "implementation"
-        args.dev_closeout = "verified"
+        args.integration_closeout = "verified"
         args.plan_milestones = 2
         record = telemetry.build_record(args)
         self.assertEqual(record["scope"]["comparison_reliability"], "multi_turn_unbounded")
@@ -456,7 +606,7 @@ class TelemetryTests(unittest.TestCase):
         self.assertNotIn("plan_updates_exceed_milestone_budget", record["warnings"])
         self.assertIn("xhigh_without_evaluation_evidence", record["warnings"])
         self.assertIn(
-            "verified_dev_closeout_without_repository_evidence",
+            "verified_integration_closeout_without_repository_evidence",
             record["warnings"],
         )
 
@@ -471,21 +621,21 @@ class TelemetryTests(unittest.TestCase):
         self.fixtures()
         args = self.args()
         args.workflow_mode = "implementation"
-        args.dev_closeout = "verified"
+        args.integration_closeout = "verified"
         args.repo_closeout = [
-            ("frontend", "abcdef1"),
-            ("backend", "1234567"),
+            ("frontend", "staging", "abcdef1"),
+            ("backend", "integration/api", "1234567"),
         ]
         record = telemetry.build_record(args)
         self.assertEqual(
             record["semantic_summary"]["repository_closeouts"],
             [
-                {"project": "frontend", "dev_sha": "abcdef1"},
-                {"project": "backend", "dev_sha": "1234567"},
+                {"project": "frontend", "integration_branch": "staging", "integration_sha": "abcdef1"},
+                {"project": "backend", "integration_branch": "integration/api", "integration_sha": "1234567"},
             ],
         )
         self.assertNotIn(
-            "verified_dev_closeout_without_repository_evidence",
+            "verified_integration_closeout_without_repository_evidence",
             record["warnings"],
         )
 
@@ -561,13 +711,48 @@ class TelemetryTests(unittest.TestCase):
         self.assertTrue(runtime["skill_reload_alert"])
         self.assertNotIn("/Users/example", json.dumps(record))
 
-    def test_missing_implementation_dev_closeout_is_flagged(self):
+    def test_missing_implementation_integration_closeout_is_flagged(self):
         self.fixtures()
         args = self.args()
         args.workflow_mode = "implementation"
-        args.dev_closeout = "missing"
+        args.integration_closeout = "missing"
         record = telemetry.build_record(args)
-        self.assertIn("implementation_dev_closeout_missing", record["warnings"])
+        self.assertIn("implementation_integration_closeout_missing", record["warnings"])
+
+    def test_pending_candidates_are_sanitized_and_not_reported_as_integrated(self):
+        self.fixtures()
+        for state in telemetry.PENDING_INTEGRATION_CLOSEOUTS:
+            with self.subTest(state=state):
+                args = self.args()
+                args.workflow_mode = "implementation"
+                args.integration_closeout = state
+                args.snapshot_kind = "checkpoint"
+                args.outcome = "verifying"
+                record = telemetry.build_record(args)
+                self.assertEqual(state, record["semantic_summary"]["integration_closeout"])
+                self.assertEqual([], record["semantic_summary"]["repository_closeouts"])
+                self.assertIn("implementation_candidate_pending", record["warnings"])
+                self.assertNotIn("implementation_integration_closeout_missing", record["warnings"])
+                self.assertNotIn(
+                    "verified_integration_closeout_without_repository_evidence",
+                    record["warnings"],
+                )
+                self.assertNotIn(SECRET, json.dumps(record))
+
+    def test_final_accepted_pending_candidate_is_advisory_inconsistent(self):
+        self.fixtures()
+        args = self.args()
+        args.workflow_mode = "implementation"
+        args.integration_closeout = "pending_authority"
+        args.snapshot_kind = "final"
+        args.outcome = "accepted"
+        record = telemetry.build_record(args)
+        self.assertIn("implementation_candidate_pending", record["warnings"])
+        self.assertIn("pending_candidate_with_terminal_outcome", record["warnings"])
+
+        args.outcome = "accepted_with_residuals"
+        residual = telemetry.build_record(args)
+        self.assertNotIn("pending_candidate_with_terminal_outcome", residual["warnings"])
 
     def test_unbounded_tokens_are_suppressed_by_default(self):
         self.fixtures()
@@ -601,7 +786,7 @@ class TelemetryTests(unittest.TestCase):
                 "root_thread_id": ROOT,
                 "snapshot_end": f"2025-12-3{version}T00:00:00Z",
             }
-            for version in (1, 2)
+            for version in (1, 2, 3, 4)
         ]
         target = self.base / "legacy.jsonl"
         target.write_text(
@@ -609,7 +794,7 @@ class TelemetryTests(unittest.TestCase):
             encoding="utf-8",
         )
         lines, records = telemetry.read_registry(target)
-        self.assertEqual(len(lines), 2)
+        self.assertEqual(len(lines), 4)
         for legacy in legacy_records:
             self.assertIn(
                 (
@@ -671,6 +856,21 @@ class TelemetryTests(unittest.TestCase):
             telemetry.append_record(target, lower)
 
     def test_cli_rejects_invalid_window_and_replacement_without_supersedes(self):
+        parsed = telemetry.parse_args([
+            "--root-thread-id", ROOT,
+            "--cycle-id", "TEST-01",
+            "--integration-closeout", "verified",
+            "--repo-closeout", "frontend=staging@abcdef1",
+        ])
+        self.assertEqual(parsed.repo_closeout, [("frontend", "staging", "abcdef1")])
+        for state in telemetry.PENDING_INTEGRATION_CLOSEOUTS:
+            with self.subTest(state=state):
+                pending = telemetry.parse_args([
+                    "--root-thread-id", ROOT,
+                    "--cycle-id", "TEST-01",
+                    "--integration-closeout", state,
+                ])
+                self.assertEqual(state, pending.integration_closeout)
         invalid_argv = [
             [
                 "--root-thread-id", ROOT,
@@ -687,6 +887,16 @@ class TelemetryTests(unittest.TestCase):
                 "--root-thread-id", ROOT,
                 "--cycle-id", "TEST-01",
                 "--supersedes", "checkpoint:1",
+            ],
+            [
+                "--root-thread-id", ROOT,
+                "--cycle-id", "TEST-01",
+                "--repo-closeout", "frontend=abcdef1",
+            ],
+            [
+                "--root-thread-id", ROOT,
+                "--cycle-id", "TEST-01",
+                "--integration-closeout", "https://example.invalid/pr/1",
             ],
         ]
         for argv in invalid_argv:

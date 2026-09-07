@@ -14,7 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 ROLE_DIR = ROOT / "roles"
 CODEX_DIR = ROOT / "adapters" / "codex" / "agents"
 CURSOR_DIR = ROOT / "adapters" / "cursor" / "agents"
-PROFILE = ROOT / "profiles" / "codex-macos.yaml"
+PROFILE_DIR = ROOT / "profiles"
+PROFILE_NAMES = ("codex-macos.yaml", "wsl-shared.yaml")
 
 READ_ONLY = {
     "code_explorer",
@@ -73,9 +74,23 @@ def read_role(path: Path) -> tuple[dict[str, str], str]:
     return metadata, body
 
 
+def load_model_map() -> dict[str, list[str]]:
+    profiles = [
+        json.loads((PROFILE_DIR / name).read_text(encoding="utf-8"))
+        for name in PROFILE_NAMES
+    ]
+    model_map = profiles[0]["codex_agents"]
+    for profile in profiles[1:]:
+        if profile["codex_agents"] != model_map:
+            raise ValueError(
+                "Los perfiles Codex deben mapear los roles al mismo modelo y esfuerzo: "
+                f"{profiles[0]['id']} != {profile['id']}"
+            )
+    return model_map
+
+
 def render_to(base: Path) -> None:
-    profile = json.loads(PROFILE.read_text(encoding="utf-8"))
-    model_map = profile["codex_agents"]
+    model_map = load_model_map()
     codex_out = base / "codex"
     cursor_out = base / "cursor"
     codex_out.mkdir(parents=True, exist_ok=True)

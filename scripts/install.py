@@ -23,7 +23,9 @@ def digest(path: Path) -> str:
         return hasher.hexdigest()
     if not path.exists():
         return "missing"
-    for item in sorted(p for p in path.rglob("*") if p.is_file()):
+    for item in sorted(p for p in path.rglob("*")
+                       if p.is_file() and "__pycache__" not in p.relative_to(path).parts
+                       and p.suffix != ".pyc"):
         hasher.update(str(item.relative_to(path)).encode())
         hasher.update(item.read_bytes())
     return hasher.hexdigest()
@@ -44,7 +46,7 @@ def copy_with_backup(source: Path, target: Path, backup_root: Path) -> bool:
             target.unlink()
     target.parent.mkdir(parents=True, exist_ok=True)
     if source.is_dir():
-        shutil.copytree(source, target)
+        shutil.copytree(source, target, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     else:
         shutil.copy2(source, target)
     return True
@@ -90,6 +92,8 @@ def git_revision() -> str:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--profile", choices=("codex-macos", "wsl-shared"), required=True)
+    parser.add_argument("--scope", choices=("all", "routing"), default="all",
+                        help="routing updates only global contract, cycle skill and Codex/Cursor roles")
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--check", action="store_true")
     mode.add_argument("--apply", action="store_true")
@@ -97,9 +101,14 @@ def main() -> int:
 
     profile = json.loads((ROOT / "profiles" / f"{args.profile}.yaml").read_text(encoding="utf-8"))
     pairs = managed_pairs(profile)
+    if args.scope == "routing":
+        pairs = [(source, target) for source, target in pairs
+                 if source == ROOT / "AGENTS.md"
+                 or source == ROOT / "skills" / "dautia-project-cycle"
+                 or "adapters" in source.relative_to(ROOT).parts]
     differences = [(source, target) for source, target in pairs if digest(source) != digest(target)]
     launcher = Path.home() / ".local" / "bin" / "dautia-supabase"
-    launcher_differs = not launcher.is_file() or launcher.read_text(encoding="utf-8", errors="replace") != launcher_text()
+    launcher_differs = args.scope == "all" and (not launcher.is_file() or launcher.read_text(encoding="utf-8", errors="replace") != launcher_text())
 
     if args.check:
         if differences or launcher_differs:
@@ -107,7 +116,7 @@ def main() -> int:
             for source, target in differences[:12]:
                 print(f"  {source.relative_to(ROOT)} -> {target}")
             return 2
-        print(f"OK: perfil {args.profile} instalado y sincronizado")
+        print(f"OK: perfil {args.profile}, scope={args.scope} instalado y sincronizado")
         return 0
 
     timestamp = dt.datetime.now().strftime("%Y%m%dT%H%M%S")
@@ -131,6 +140,7 @@ def main() -> int:
             {
                 "profile": args.profile,
                 "revision": git_revision(),
+                "scope": args.scope,
                 "installed_at": dt.datetime.now(dt.timezone.utc).isoformat(),
                 "source": str(ROOT),
             },

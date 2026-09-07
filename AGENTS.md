@@ -1,193 +1,176 @@
 # Guia global para agentes
 
-Contrato v8 — 2026-08-28T00:00:00-05:00.
+Contrato v13 — 2026-09-07.
 
-Prevalecen la instruccion del usuario y el `AGENTS.md` mas cercano. Las skills
-complementan: no agregan etapas, documentos, agentes ni gates.
+Prevalecen la instruccion del usuario y el AGENTS.md mas cercano. Las skills
+complementan: no conceden autoridad ni agregan fases, documentos o agentes.
 
-## Limites y autoridad
+## Intencion, autoridad y limites
 
-- No destruir datos, filtrar secretos, inventar estado externo ni modificar
-  produccion sin intencion clara. Preservar cambios ajenos.
-- Verificar repo, rama, ambiente, proveedor y revision; un documento o comando
-  no prueba deploy, migracion, upload ni estado activo.
-- `data_security` es opt-in del turno; Auth, RLS, privacidad y secretos siguen
-  siendo trabajo tecnico normal. Un enjambre grande exige beneficio, costo,
-  riesgo y aprobacion.
-- Colima se trata como no disponible: nunca instalarlo, iniciarlo, configurarlo,
-  usarlo ni depender de el.
-- Toda prueba ejecutada localmente que necesite base de datos usa la DB de `staging`
-  verificada; nunca local ni produccion. Sin staging queda bloqueada.
-  Las mutantes aislan y limpian fixtures; reset, seed global, migracion o
-  limpieza remota requieren autoridad.
+Conservar el resultado que busca el usuario y sus exclusiones durante todas las
+iteraciones. No destruir datos, filtrar secretos, inventar estado externo ni
+revertir cambios ajenos. Produccion, deploy, migracion remota y upload requieren
+intencion clara al target. Una autorizacion vigente no se pide de nuevo.
 
-Supabase se autentica una vez por host con `dautia-supabase`: sesion de cuenta y
-una password DB por `project_ref`. El registro local
-`~/.config/dautia/supabase-db-credentials.json` usa `0600`; Mac puede importarlo
-una vez desde Keychain y WSL lo llena durante onboarding. Los comandos normales
-no abren prompts ni copian secretos entre hosts, proyectos, argumentos, logs o
-chat. Publishable, service-role y access tokens no sustituyen la password DB.
-`run --environment` autoenlaza checkouts; `activate` solo repara contradicciones.
-Fuera de `supabase login`, usar el wrapper, nunca `supabase`, `npx supabase`,
-`psql` ni una version ad hoc. Si vuelve a pedir clave, detener el bypass; no
-pedirsela otra vez al usuario.
+Una implementacion de codigo de producto incluye pruebas, verdad relevante,
+commit/push y PR segun reglas reales: autor -> revision independiente -> correcciones
+del autor -> dictamen del head final -> merge a integration_branch con autoridad
+vigente. Si se pidio ver el informe antes, esperar ese go; no pedirlo de nuevo si
+la integracion ya estaba autorizada. El detalle vive en [revision](skills/dautia-project-cycle/references/audit-evidence.md).
+Sin contrato, dev es fallback solo tras comprobar reglas; no inventar ramas.
+Una excepcion al PR exige instruccion o contrato explicitos; prohibir ramas cortas
+no prueba que PR sea imposible. No cambiar protecciones de GitHub por ceremonia.
+Config viva, datos y artefactos manuales no generan PR ficticio; codigo/config de
+producto versionado si sigue revision. main/promociones/deploy/upload/migracion
+remota mantienen su autoridad; identificar autodeploy antes del merge.
 
-Apple se configura una vez por identidad en Keychain, incluido el permiso
-persistente de `codesign`. No guardar contrasenas, certificados ni credenciales
-Apple en Git, env, argumentos o chat. Usar el wrapper de archive/export del
-proyecto; un dialogo normal de credencial indica bypass o ACL incompleta y se
-detiene sin reintentos.
+Colima se trata como no disponible: nunca instalarlo, iniciarlo ni usarlo.
+Toda prueba ejecutada localmente que necesite base de datos usa la DB de staging
+verificada; nunca local ni produccion. Sin staging solo se bloquea esa frontera;
+continuar pruebas puras y trabajo independiente. Fixtures mutantes se aislan y
+limpian; reset, seed global, migracion y limpieza remota necesitan autoridad.
+`data_security` es opt-in: una solicitud explicita de auditoria/revision de seguridad
+en el turno, o el nombre del rol. Auth/RLS ordinario no lo activa. La autoridad
+viaja al hijo con la frase fuente; una auditoria no concede correcciones.
 
-Una implementacion expresa incluye commit y push a la `integration_branch` de
-`delivery.yaml`, o `dev` sin contrato. `staging` integra solo si el contrato lo
-declara; `main`, deploy, migracion remota, TestFlight y produccion requieren una
-orden al target. Un deploy manual autoriza solo ese target y exige fuente,
-acceso, rollback y smoke focal; no exige PR por ceremonia.
+Para Supabase usar dautia-supabase, nunca psql, npx supabase ni DDL por MCP; MCP
+queda para lectura. Para Supabase, Apple, hosts y proveedores leer una vez la
+seccion pertinente de [infraestructura](skills/dautia-project-cycle/references/infrastructure.md).
+No trasladar secretos entre hosts ni convertir un fallo de acceso en otro target.
 
-## Cuatro modos
+## Modo y continuidad
 
-Clasificar por resultado:
+Clasificar por resultado: Descubrimiento refina sin mutar; Auditoria compara
+frase fuente, docs, implementacion y superficie y entrega As-Is, delta, To-Be,
+aceptacion y plan sin mutar; Implementacion ejecuta la decision autorizada e
+integra; Release promueve un candidato validado al target autorizado y lo verifica.
+Los pedidos mixtos corren en ese orden. Un plan solo no concede implementacion.
 
-1. **Descubrimiento** — refinar idea, decisiones y dudas; no mutar codigo ni
-   documentacion canonica salvo pedido.
-2. **Auditoria** — comparar frase fuente, docs funcionales, codigo/modelo/datos y
-   superficie observable. Entregar As-Is, delta, To-Be, aceptacion y plan; no
-   mutar.
-3. **Implementacion** — implementar la decision aceptada, probar, actualizar la
-   verdad relevante e integrar.
-4. **Release** — evaluar el SHA validado y promover solo el linaje `READY` al
-   ambiente autorizado; luego verificarlo.
+Usar dautia-project-cycle al iniciar o reencuadrar trabajo no trivial. Mantener
+resultado, aceptacion, restricciones, autoridad, ambiente, candidato y pendientes.
+Un plan visible tiene 3–5 hitos observables; actualizar solo cambios materiales.
+Una skill se lee completa una vez por objetivo; follow-ups reutilizan su carga.
+No convertir memoria, skills o comandos en fases de trabajo.
 
-Los pedidos mixtos corren en orden: “audita y corrige” agrega Implementacion;
-“corrige y despliega a staging” agrega Release. Un plan no concede mutacion.
-Promover staging a main fija SHA y separa aplicacion, DB/datos, infraestructura y
-docs; valida orden, artefactos, checksums, historial, backup/rollback y verdad
-externa. Correcciones sucesivas reutilizan baseline y evidencia; un cambio
-material de resultado, autoridad o ambiente inicia un subciclo condensado, no
-otra tarea obligatoria.
+Se pueden mantener conversaciones largas. Al cambiar de fase, antes de Release
+/E2E costoso o tras correcciones que cambien la decision, condensar una vez
+aceptacion vigente, candidato, evidencia, pendientes, autoridad y parada.
+Marcar decisiones reemplazadas; no crear una tarea o archivo por ceremonia.
+Para specs, diseño visual y cierre consultar [continuidad](skills/dautia-project-cycle/references/continuity.md)
+solo cuando esa frontera cambie. La conversacion descubre; la fuente canonica
+existente conserva lo aceptado. Propuesto, aceptado, implementado, verificado y
+desplegado son estados distintos.
 
-## Ejecucion simple
+## Modelos, agentes y herramientas
 
-Para trabajo no trivial fijar resultado, aceptacion, evidencia, restricciones,
-autoridad, ambiente y parada. Un plan visible tiene 3 a 5 hitos observables, uno
-en progreso; skills, memoria y comandos no son pasos. Actualizarlo solo ante
-cambio de hito, alcance o bloqueo.
+El perfil del host asigna modelos a roles. Sol high es el default conservador para
+conversacion habitual que evoluciona a implementacion y trabajo sustantivo.
+Sol medium para consultas breves o bloques definidos; low para operaciones
+simples verificables. No bajar el esfuerzo de un hilo por cada comando; xhigh para una pregunta tecnica
+profunda y delimitada. Astra low es candidato para juicio focal con evidencia;
+Astra medium para incertidumbre transversal o ejecucion compleja acoplada.
+Elegir por decisiones pendientes, acoplamiento y evidencia, no por fase, marca,
+numero de pantallas ni sensibilidad por si sola. Las asignaciones son hipotesis
+adaptables; no garantizan igual calidad o ahorro. Techo: Astra medium; Sol max,
+ultra y esfuerzos de Astra superiores a medium quedan fuera de esta politica.
+No hay escalera obligatoria ni auditor Astra universal. Falta de acceso, datos,
+fixture o dispositivo exige resolver esa frontera, no subir esfuerzo.
 
-Antes de Release, E2E costoso o tras muchas correcciones, condensar una vez:
-resultado, candidato, ambiente, alcance/anti-alcance, proveedores y orden,
-artefactos DB, evidencia vigente, fronteras pendientes, rollback, autoridad y
-parada. Descartar planes reemplazados y outputs extensos; no crear un archivo por
-ceremonia.
+Astra entrega a Sol cuando decisiones/interfaces/invariantes quedan resueltas y
+el bloque es independiente; si siguen acopladas, conserva ejecucion y cierre.
+Para seleccionar perfiles y destinos efectivos leer [modelos](skills/dautia-project-cycle/references/model-routing.md).
+En auditorias sustantivas desde el usuario con decisiones de interaccion o
+prioridad, preferir delegar el juicio focal a ux_auditor (Astra low), con evidencia
+original; consulta breve, correccion definida o raiz equivalente siguen directas.
+Resolver la seleccion antes de redactar el dictamen, no añadir otro redactor.
+Al cambiar materialmente decisiones o acoplamiento, aplicar la decision operativa
+de modelos antes del bloque dependiente; configurar un rol no lo invoca.
+La skill no cambia el modelo raiz. Conservar un modelo economico solo si iguala
+aceptacion y correcciones y reduce costo total. Medir resultado, no marca o conteos.
 
-Antes de cambiar, identificar raiz, Git, rama, codebases y ambiente. Leer una
-vez los contratos relevantes. Una skill se lee completa una vez por objetivo;
-follow-ups y reintentos reutilizan la carga. Una skill de proveedor no obliga a consultar changelogs
-o la web salvo duda real de version o API.
+Implementacion sustantiva definida: delegar a implementer Sol medium si hay un bloque
+independiente y trabajo util concurrente para la raiz. Ejecucion directa solo para
+deltas minimos, handoff mas costoso que el trabajo o ausencia de trabajo concurrente
+util; indicar el motivo una vez, sin fabricar paralelismo. implementer_complex Sol
+high exige decisiones tecnicas acopladas pendientes, no solo varios archivos.
+Descubrimiento focal sustantivo: product_discovery Astra low. Aclaracion breve:
+raiz. Incertidumbre transversal abierta: systems_analyst Astra medium.
+Cero delegaciones sigue siendo valido en las excepciones anteriores, salvo la
+revision independiente de codigo solicitada.
+Delegar bloques independientes por oleadas con un escritor por unidad, objetivo,
+baseline, autoridad, aceptacion, evidencia y parada; default fork_turns="none".
+Transmitir el contenido de dependencias resueltas, no solo esperar su finalizacion.
+Reconciliar todas las partes requeridas; no resolver desacuerdos por voto de modelos.
+Antes de cerrar una frontera delegada, recibir la entrega terminal del agente y
+resolver su evidencia/hallazgos. No sustituir un dictamen requerido con analisis
+propio ni dar por completado un hijo iniciado, pendiente o cancelado. Continuar
+lo independiente mientras se espera; cierre pendiente si falta esa entrega.
+Historia heredada solo si no puede condensarse sin perder semantica. El principal
+despacha y conserva el resultado; max_depth=1, sin supervisores ni nietos.
+Un enjambre grande exige beneficio/costo/riesgo y aprobacion. Un release_operator
+posee (revision, target, alcance); nunca crea otro agente.
 
-Un cambio de workflow no alcanza tareas activas. Registrar version/hora; la
-tarea previa queda `stale_contract` y recarga o reinicia antes de nuevas
-mutaciones externas. Inspeccionar `--help` o fuente de un CLI propio una vez,
-sin aprender por reintentos evitables.
+Preferir skill pertinente sin GUI, MCP/API o CLI reproducible segun la frontera;
+automatizacion nativa/navegador para lo observable y computer-use si no hay
+interfaz fiable o lo pide el usuario. Disponibilidad no prueba autenticacion.
+Plugins externos son complementos: no cambian proveedor, autoridad, Gitflow,
+aceptacion o parada. Antes de usar un plugin con recetas amplias consultar solo
+su familia en [limites de plugins](skills/dautia-project-cycle/references/plugin-boundaries.md).
+No aprovisionar, instalar servicios, publicar ni responder comentarios ajenos
+por una receta. Usar govern-project-documentation solo para topologia, fuentes
+de verdad, trazabilidad o normalizacion; lectura ordinaria no la activa.
 
-Filtrar resultados en origen. Resumir exitos y expandir fallos; outputs rutinarios
-mayores a 10.000 caracteres requieren recorte o justificacion. No introducir
-binarios, base64 ni logs completos al contexto. Para UI usar una muestra representativa o contact sheet,
-no capturas por micro-paso.
+## Proyecto, evidencia y entrega
 
-En suites, builds o esperas largas, avisar antes y consultar cada 30–60 segundos.
-Un watcher por dependencia; tras dos resultados sin cambio, esperar una señal.
-Para otra tarea de Codex usar primero listado o snapshot compacto; leer turnos
-solo ante una anomalia concreta y sin outputs grandes.
+Identificar raiz Git, rama, codebases y ambiente antes de cambiar. Separar
+producto y layout Git. delivery.yaml guarda mapa estable, integration_branch,
+identidades no secretas y checks; CURRENT o proveedor guarda estado mutable.
+No imponer un contrato a carpetas inactivas ni copiar manuales globales a repos.
 
-Usar `dautia-project-cycle` al iniciar o reencuadrar trabajo no trivial, no por
-follow-up. Cero delegaciones es valido. Con bloques independientes, delegar por
-oleadas: contrato compartido, implementacion con ownership y revision cuando
-exista artefacto. Default `fork_turns="none"` con handoff de objetivo, baseline,
-autoridad, aceptacion, evidencia y parada. Historia parcial/completa solo cuando
-una conversacion no resuelta no pueda condensarse. Sobreorquestacion requiere
-evidencia de duplicacion, conflicto, resultado inutil, polling o gate sin riesgo;
-no conteos de agentes, tokens, tools o skills.
+Inspeccionar reglas reales del target antes de rama/PR. Si checkout esta sucio o
+atrasado, preservar cambios y usar baseline de integracion y worktree aislado
+cuando las reglas lo permitan. No asumir que un AGENTS padre fuera de Git se
+carga. Cerrar cada repo afectado con rama, SHA y evidencia; no commits vacios.
+Git sincroniza codigo/docs, nunca .env, credenciales, sesiones ni artefactos.
 
-Usar `govern-project-documentation` solo para topologia, fuentes de verdad,
-trazabilidad, scaffolding o normalizacion; no para lectura ordinaria.
-
-## Harnesses, modelos y hosts
-
-Este contrato rige igual en Codex y Cursor. Plugins externos son complementos:
-no cambian autoridad, ambiente, Gitflow, aceptacion, evidencia ni parada.
-El perfil del host asigna modelos a roles. Conservar un modelo economico solo si
-iguala aceptacion y correcciones y reduce costo total sin regresiones; si falla, Sol.
-Medir resultado y costo, no conteos ni marca.
-
-Mac posee Xcode, Simulator, codesign, TestFlight y App Store Connect. WSL puede
-trabajar web, backend, docs, Android y proveedores declarados; editar Swift no
-prueba iOS. Git sincroniza codigo y docs, nunca `.env`, credenciales, sesiones,
-caches, worktrees ni artefactos. Una release compartida tiene un propietario y
-fija `(SHA, target, alcance, host)`.
-
-## Repositorios y worktrees
-
-Separar topologia del producto (web, backend, iOS, Android, datos, infra) del
-layout Git (`single-repo`, `monorepo`, `multi-repo`). `delivery.yaml` guarda el
-mapa estable; `CURRENT.md` o el proveedor guardan estado mutable.
-
-El destino de Implementacion es la rama `integration_branch`: trabajar alli o
-en una rama corta basada en ella, validar, integrar y subir. Sin contrato, usar
-`dev`. No declarar cierre si el cambio solo quedo en una rama efimera, salvo
-resultado local expreso. Default `feature/* -> dev`; promociones son separadas.
-
-Antes de una rama/PR, inspeccionar reglas reales del target. Si el checkout esta
-sucio, atrasado o no representa integracion, leer el contrato una vez desde
-`origin/<integration_branch>` y usar `<raiz>/.worktrees/<tarea>`. No limpiar ni
-adoptar docs obsoletas. Retirar el worktree cuando el commit sea recuperable.
-
-En multi-repo, aplicar el incremento solo a repos afectados, desde sus baselines,
-con pruebas, commits y pushes trazables. Cerrar `repo -> rama -> SHA -> evidencia`;
-no crear commits vacios.
-
-Un `release_operator` posee `(revision fuente, ambiente/target, alcance)` y puede
-secuenciar proveedores que compartan revision, autoridad, dependencias y
-rollback. Separar solo si cambia un limite o el fallo es independiente. Nunca
-crea otro `release_operator`; una ampliacion vuelve al agente raiz.
-
-## Pruebas, UI y cierre
-
-Preferir evidencia reproducible: 1) skill especializada sin GUI; 2) MCP/API; 3)
-CLI/script; 4) automatizacion nativa; 5) navegador/Playwright; 6)
-`computer-use`, solo si no existe interfaz fiable o el usuario lo pide.
-
-Probar por riesgo: focal -> modulo -> integracion -> E2E -> regresion. Suites
-completas, multi-device, performance, memoria o accesibilidad profunda exigen un
-riesgo o gate. Reutilizar evidencia verde solo para la misma revision o una
-correccion que no invalide su frontera. Mantener
-`revision -> frontera -> prueba -> resultado`; repetir solo dependencias
-afectadas. Copy/layout no invalida DB/Auth; contratos, datos, routing, cache,
-Auth o journey si.
-
-En movil, la regresion usa mocks/fakes. Un proveedor real recibe un smoke focal
-solo si cambio esa frontera, con capacidad, build, dispositivo, maximo de
-operaciones, cuota/costo y parada. Google Navigation reutiliza una ruta; Apple/
-Google Sign-In, APNs y StoreKit siguen el mismo criterio. Supabase staging y
-Vercel conservan sus contratos propios.
-
-DB staging y produccion son independientes. Git transporta migraciones
-inmutables, nunca filas. DDL usa CLI/wrapper; MCP queda para lectura. Produccion
-exige autoridad, identidad, historial, backup/PITR, compatibilidad y postflight;
-cambios incompatibles usan expandir -> migrar -> contraer.
-
-Validacion local es default. GitHub Actions solo como check requerido, gate,
-runner externo o riesgo no demostrable localmente. Reutilizar runs verdes del
-mismo SHA; no pushes vacios ni reejecuciones sin cambios. Abrir PR de promocion
-solo al iniciar Release. Limitar triggers/rutas, cancelar obsoletos y reservar
-artefactos para fallo, manual o release con retencion minima.
+Traducir E2E a actor, recorrido, ambiente, proveedores, operaciones permitidas y
+señal observable de terminado. Probar focal -> modulo -> integracion -> E2E ->
+regresion segun riesgo. Suites completas/multi-device/performance necesitan una
+frontera que demostrar. Mantener revision -> frontera -> prueba -> resultado;
+repetir solo lo invalidado. Copy/layout no invalida DB/Auth; contratos, datos,
+routing, cache, Auth y journey pueden hacerlo. Verificar el canal del usuario,
+no sustituirlo por un smoke interno.
 
 La calidad incluye mantenibilidad, accesibilidad, rendimiento y seguridad
-proporcional. En superficies visibles, pruebas verdes no prueban aceptacion visual:
-cada dato, copy, KPI, badge, tabla, icono o ayuda debe apoyar una
-decision, accion, estado no obvio o recuperacion acorde al rol y dominio. Sin
-valor demostrable se omite; una buena estructura explica el flujo ordinario.
+proporcional al cambio; limitar suites profundas no elimina esas dimensiones.
 
-Actualizar docs cuando cambien comportamiento, arquitectura, operacion o
-trazabilidad, sin documentos ceremoniales. Cerrar con alcance, archivos,
-pruebas, docs, Git, verdad externa y residuales. Tras dos consultas externas sin
-señal, esperar o cerrar honestamente.
+En superficies visibles, pruebas verdes no prueban aceptacion visual: conservar
+referencia, assets, delta permitido y composicion. Cada dato, copy, KPI, badge,
+tabla, icono o ayuda debe aportar a una decision, accion, estado o recuperacion
+segun rol y dominio. Verificar que la fuente visual esperada este en el build.
+
+Validacion local es default; CI solo por check requerido, runner o riesgo no
+probable localmente. Reutilizar verde vigente, sin pushes vacios ni reejecuciones
+sin cambio. En movil usar mocks/fakes para regresion y smoke real focal cuando
+cambie proveedor; limitar operaciones y costo. Editar Swift no prueba iOS.
+
+Filtrar en origen: exitos resumidos, fallos focales; outputs rutinarios mayores
+a 10.000 caracteres se recortan. UI usa muestra representativa/contact sheet.
+En esperas largas comunicar progreso cada 30–60 s; un watcher por dependencia,
+tras dos resultados sin cambio esperar señal. Revisar otra tarea con snapshot
+compacto antes de leer turnos. Filtrar respuestas por tipo de item y presupuesto
+total antes de emitirlas; los limites solicitados al servidor pueden no bastar. Sobreorquestacion exige evidencia de duplicacion,
+conflicto, polling o gate sin riesgo; no conteos de agentes/tokens/skills.
+
+Conservar requisito aceptado -> cambio -> evidencia -> pendiente durante cada
+traspaso y cierre. Pruebas verdes no cierran requisitos omitidos; una decision nueva
+se devuelve al responsable. Operaciones manuales/OpenClaw prueban entrada, objeto,
+efecto tecnico y resultado de negocio pertinente; health no sustituye ese resultado.
+No crear una matriz o documento por ceremonia ni cron/monitor sin pedido de recurrencia.
+
+Actualizar verdad cuando cambie comportamiento, arquitectura, operacion o
+trazabilidad. Cerrar resultado, evidencia, Git, verdad externa y residuales.
+Telemetria es diagnostica; no fase ni gate. Configuracion y contrato nuevos son
+forward-only: tareas previas stale_contract recargan antes de nuevas mutaciones
+externas. Este contrato rige en Codex y Cursor mediante su carga efectiva; no
+suponer sincronizacion automatica entre hosts o herramientas.
