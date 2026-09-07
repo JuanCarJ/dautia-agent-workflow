@@ -20,7 +20,8 @@ cd ~/DautIA/workflow/dautia-agent-workflow
 
 ## 2. Instalar para Codex y Cursor
 
-Primero revisa lo que cambiara y despues aplica:
+Solo durante el bootstrap inicial de un host nuevo, revisa la instalacion
+completa, aplicala y ejecuta el diagnostico:
 
 ```bash
 python3 scripts/install.py --profile wsl-shared --check
@@ -70,10 +71,10 @@ deben editar la misma rama simultaneamente.
 ```bash
 cd ~/DautIA/workflow/dautia-agent-workflow
 git pull --ff-only
-python3 scripts/install.py --profile wsl-shared --apply
-python3 scripts/doctor.py --profile wsl-shared
+python3 scripts/install.py --profile wsl-shared --scope routing --check
+python3 scripts/install.py --profile wsl-shared --scope routing --apply
+python3 scripts/install.py --profile wsl-shared --scope routing --check
 ```
 
-Si `doctor.py` termina sin `FAIL`, el runtime compartido esta sincronizado. Los
-`WARN` de herramientas opcionales solo bloquean el proyecto que realmente las
-necesite.
+El ultimo check confirma que AGENTS, dautia-project-cycle y los roles quedaron
+sincronizados sin reemplazar skills mas nuevas instaladas en el host.

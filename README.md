@@ -24,8 +24,11 @@ certificados, sesiones ni memorias.
 ```bash
 python3 scripts/render_agents.py --check
 python3 scripts/check_portability.py
-python3 scripts/install.py --profile codex-macos --check
+python3 scripts/install.py --profile codex-macos --scope routing --check
 ```
+
+La comprobacion completa `--scope all --check` se ejecuta por separado y puede
+mostrar deriva historica en skills que no pertenecen al cambio de routing.
 
 Consulta [la arquitectura](docs/architecture.md) y la
 [instalacion en Windows](docs/windows-installation.md). La

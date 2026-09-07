@@ -3,6 +3,7 @@ import importlib.util
 import json
 from pathlib import Path
 import tempfile
+import subprocess
 import unittest
 from unittest.mock import patch
 spec = importlib.util.spec_from_file_location('installer', Path(__file__).resolve().parents[1] / 'scripts/install.py')
@@ -10,6 +11,14 @@ installer = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(installer)
 
 class RoutingInstallTests(unittest.TestCase):
+    def test_dirty_source_never_claims_exact_committed_revision(self):
+        for status, expected in [(" M AGENTS.md\n", "uncommitted:abc123"), ("", "abc123")]:
+            with self.subTest(status=status), patch.object(installer.subprocess, 'run', side_effect=[
+                subprocess.CompletedProcess([], 0, 'abc123\n'),
+                subprocess.CompletedProcess([], 0, status),
+            ]):
+                self.assertEqual(installer.git_revision(), expected)
+
     def test_routing_install_preserves_unrelated_newer_assets_and_is_idempotent(self):
         with tempfile.TemporaryDirectory() as raw:
             home = Path(raw)

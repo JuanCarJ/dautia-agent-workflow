@@ -86,7 +86,16 @@ def git_revision() -> str:
         capture_output=True,
         check=False,
     )
-    return result.stdout.strip() if result.returncode == 0 else "uncommitted"
+    if result.returncode != 0:
+        return "uncommitted"
+    revision = result.stdout.strip()
+    status = subprocess.run(
+        ["git", "-C", str(ROOT), "status", "--porcelain"],
+        text=True, capture_output=True, check=False,
+    )
+    if status.returncode != 0 or status.stdout.strip():
+        return f"uncommitted:{revision}"
+    return revision
 
 
 def main() -> int:
