@@ -1,4 +1,4 @@
-# Continuidad de producto y entrega · v10
+# Continuidad de producto y entrega · v13
 
 Usar cuando cambien requisitos, diseño, frontera de entrega o decisiones durante
 un hilo largo. Para una correccion pequeña basta mantenerlo en contexto.
@@ -10,6 +10,19 @@ recorrido, restricciones, ambiente, ejemplos positivos/negativos y señal final.
 No hacerlo reescribir un prompt perfecto ni convertir una correccion en nuevo
 proyecto. Distinguir preferencia nueva, aclaracion, defecto y requisito olvidado.
 Conservar la frase fuente cuando una decision cambie el significado del producto.
+
+La conversacion libre, por voz o texto, es entrada valida aunque tenga errores,
+repeticiones o alternativas incompatibles. Reconstruir intencion sin convertir
+una idea exploratoria en requisito aceptado o autorizacion. Distinguir lo dicho
+por el usuario, inferencia del agente y propuesta; conservar ejemplos y motivos
+que cambien la interpretacion. Al cambiar materialmente alcance o fase, devolver
+una sintesis breve de objetivo, restricciones, decisiones vigentes y dudas
+materiales. No resumir cada mensaje ni imponer confirmacion rutinaria: continuar
+si aceptacion y autoridad son claras. Preguntar solo cuando la ambiguedad cambie
+materialmente resultado, datos, autoridad o reversibilidad; mientras tanto,
+continuar el trabajo independiente. Nuevas ideas durante ejecucion se clasifican
+como correccion, cambio autorizado o propuesta futura; no ampliar alcance
+silenciosamente ni crear documentos o agentes solo por conversar.
 
 Usar la spec/requisitos canonicos existentes. Versionar cambios durables de
 comportamiento, contratos, arquitectura o decisiones necesarias para mantenimiento.

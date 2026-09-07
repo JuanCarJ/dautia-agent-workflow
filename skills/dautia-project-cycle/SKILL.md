@@ -12,6 +12,8 @@ Load this file once per material objective. Reuse one baseline through correctio
 The root agent owns scope, authority, integration, and verdict.
 Maintain accepted requirement -> implemented delta -> relevant evidence -> residual
 through handoffs and closeout. A green suite cannot close an omitted requirement.
+Free-form voice or text is valid input: distinguish user statements, inferences and proposals. Summarize intent at material scope/phase changes, not every message; preserve examples and reasons that affect acceptance. Clear existing authority needs no routine reconfirmation.
+
 Unresolved product decisions return to the owner; do not silently invent them. Choose the smallest workflow that proves the outcome; defined substantive implementation goes to implementer (Sol medium) when an independent block and useful concurrent root work exist. Direct execution is reserved for minimal deltas, handoff cost exceeding work, or no useful concurrent work; record the reason once. Independent code review remains required. Focal substantive discovery goes to product_discovery (Astra low); brief clarification stays with root, open transversal uncertainty goes to systems_analyst (Astra medium).
 
 Treat Colima as unavailable. Database-dependent local tests use the project's verified staging database, never local or production. Without proven staging identity, report validation blocked; do not substitute a target.
