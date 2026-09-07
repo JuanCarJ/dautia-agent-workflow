@@ -1,4 +1,4 @@
-# Evaluacion y adopcion · v11
+# Evaluacion y adopcion · v13
 
 Para evaluacion solicitada usar dautia-workflow-evaluation: scripts/run_replay.py
 compara casos sanitizados con el CLI Codex real. El piloto inicial prueba decisiones
@@ -19,7 +19,7 @@ No activar una automatizacion sin cadencia solicitada. Sol high es la base habit
 Version nueva se carga en
 sesiones nuevas; antes de mutacion externa desde una tarea previa, reconciliar contrato.
 
-## Adopcion v11
+## Evidencia historica v11
 
 Astra low y Sol xhigh no participaron en el piloto inicial. Un replay verde solo
 prueba su contrato de respuesta y routing, no calidad UI ni implementacion. No
@@ -32,12 +32,19 @@ la rubrica, preservar resultados originales y regraduar todos por igual.
 La cuota global concurrente no atribuye consumo por tarea. Separar tiempo humano,
 herramientas y espera; distinguir omisiones de nuevas decisiones del usuario.
 
-## Aceptacion de adopcion v11
+## Aceptacion de adopcion vigente
 
 Separar replay de decisiones, prueba de resolucion de roles y simulacion real con
 herramientas/artefactos. El replay read-only deshabilita subagentes por diseño;
 no prueba despacho. Las simulaciones deben verificar parentesco y turn_context
-propios, artefacto/aceptacion, regresion focal y ausencia de mutaciones externas.
+propios y perfil al producir respuestas con consumo, artefacto/aceptacion,
+regresion focal y ausencia de mutaciones externas. Un contexto de inicializacion
+sin respuesta no demuestra ejecucion con ese esfuerzo.
+Los catalogos/resultados v11/v12 son historicos: para v13 congelar una rubrica
+nueva con product_discovery Astra low e implementer Sol medium para el bloque
+resuelto. No usar sus expectativas antiguas para diagnosticar una violacion v13
+ni modificar retrospectivamente resultados originales. Despacho forzado no
+demuestra seleccion autonoma; explicitar cual de los dos se esta midiendo.
 Incluir casos simples sin delegacion, cambio de fase y correcciones materiales.
 No dar expected answers al ejecutor; congelar rubrica, conservar fallos originales
 y exigir casos negativos (hijo ausente, perfil distinto, requisito omitido).
