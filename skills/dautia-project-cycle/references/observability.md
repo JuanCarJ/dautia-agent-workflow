@@ -37,7 +37,7 @@ Run `scripts/dautia_terminal_guard.py` before durable external wait or release c
 
 Routine work needs no custom snapshot: the normal closeout already records outcome, tests, Git/external truth and residuals. Generate deep snapshots with `scripts/dautia_cycle_telemetry.py` only for costly external waits, incidents, workflow audits, or explicit telemetry requests. Use `checkpoint` while the objective remains open and `final` only after evidence-backed closeout. Prefer a bounded time window aligned to token snapshots or a session boundary. A start between snapshots excludes the crossing delta, and an unaligned end is partial; the collector never assigns an indivisible boundary interval to the latest model. Unbounded aggregate token totals are suppressed by default because they can conflate objectives; include them only with the explicit CLI override and label them cumulative.
 
-Schema v5 records the operator-supplied `objective_id`, one of the four workflow modes, `integration_closeout`, the effective integration branch evidence, and an optional release target while remaining able to read v1-v4 registries. Model and reasoning-effort distributions use effective turn segments, including context carried into a bounded window, rather than the last profile seen in each session. Token output includes privacy-safe per-turn/model/effort/counter-epoch segments and aggregates by model plus effort. A counter decrease begins a new epoch: the post-reset snapshot is retained as an observable lower bound, while the unobserved crossing interval increments `unknown_gaps` and makes coverage partial. `reasoning_output_tokens` is a component of output telemetry and must not be added again to `total_tokens`.
+Schema v6 keeps the v5 fields and records the operator-supplied `objective_id`, one of the four workflow modes, `integration_closeout`, the effective integration branch evidence, and an optional release target while remaining able to read v1-v5 registries. Model and reasoning-effort distributions use effective turn segments, including context carried into a bounded window, rather than the last profile seen in each session. Token output includes privacy-safe per-turn/model/effort/counter-epoch segments and aggregates by model plus effort. A counter decrease begins a new epoch: the post-reset snapshot is retained as an observable lower bound, while the unobserved crossing interval increments `unknown_gaps` and makes coverage partial. `reasoning_output_tokens` is a component of output telemetry and must not be added again to `total_tokens`.
 
 Bound the time window whenever one thread contains several user turns; otherwise the snapshot labels its comparison reliability as `multi_turn_unbounded` instead of pretending that every event belongs to one objective. It walks the complete descendant tree, distinguishes direct children and maximum depth, and flags nested release operators. It also separates task starts from completions, agent waits from generic execution waits, and one objective-level skill load from raw file-read calls. Same-turn extra reads may be legitimate pagination; `skill_reload_turns` is the stronger signal that a skill was reopened during the same bounded objective.
 
@@ -66,3 +66,14 @@ model/effort and child linkage, not role names or requested configuration. Missi
 observations are unknown. Separate mandatory failures, conditional applicability
 and preferences; stale creation time alone does not prove instructions were not
 reloaded. Preserve privacy constraints above; no per-command telemetry gate.
+
+## Runtime completion correction · 2026-09-08
+
+`sessions.complete` reflects the latest identifiable runtime turn at the window
+boundary, not any historical completion. `latest_turn_states` distinguishes open,
+completed, aborted and unknown; historical start/completion counts remain separate.
+A new open turn invalidates the earlier completion as evidence of an exact token
+end boundary. Late terminal events with a different turn ID do not close it.
+These fields still do not certify acceptance, integration or provider completion.
+Compare profile activity with positive observed output, not initialization contexts
+alone, when auditing effective routing.

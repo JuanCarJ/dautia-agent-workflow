@@ -77,6 +77,10 @@ autor puede corregir la prueba dentro de autoridad vigente si la intencion es
 inequivoca. Si fuente/test son inmutables o falta una decision, conservar conflicto
 y frontera pendiente, sin dictamen favorable de esa aceptacion.
 
+Contrastar tambien las fronteras que el autor prometio probar: una configuracion
+Chromium no acredita WebKit, ni una unitaria un recorrido con proveedor. El cierre
+enumera las excepciones reales; no usar "solo falta" si omite alguna aceptacion.
+
 Publicar checklist/comentarios del PR cuando esa comunicacion esta autorizada por
 el encargo. Con la misma cuenta GitHub no fingir aprobacion nativa independiente.
 Un nuevo head invalida el dictamen favorable hasta revisar el delta; cambios de base
@@ -92,6 +96,10 @@ cortas no demuestra imposibilidad. Preparar el candidato mientras se resuelve un
 incompatibilidad real. No añadir protecciones, daemon de merge ni vigilancia perpetua.
 Config viva/datos/artefactos manuales siguen su autoridad y readback, sin PR ficticio.
 Fuentes globales sin Git usan respaldo, diff y revision proporcionada.
+
+Si se descubre un release previo sin dictamen recuperable, la revision posterior
+se fecha y etiqueta retrospectiva; no reconstruir una aprobacion previa ficticia.
+No repetir deploy para completar evidencia documental.
 
 ## Checklist de promocion
 
