@@ -254,6 +254,117 @@ class TelemetryTests(unittest.TestCase):
         self.assertIn("unknown_event_type_ignored", record["warnings"])
         self.assertNotIn(SECRET, json.dumps(record))
 
+    def test_latest_identified_turn_stays_open_after_historical_completion(self):
+        first_turn = "01a00000-0000-7000-8000-000000000001"
+        second_turn = "01a00000-0000-7000-8000-000000000002"
+        self.write_session("root", [
+            event("2026-01-01T00:00:00Z", "session_meta", {"id": ROOT}),
+            event("2026-01-01T00:00:01Z", "event_msg", {
+                "type": "task_started", "turn_id": first_turn,
+            }),
+            event("2026-01-01T00:00:02Z", "event_msg", {
+                "type": "task_complete", "turn_id": first_turn,
+            }),
+            event("2026-01-01T00:00:05Z", "event_msg", {
+                "type": "task_complete", "turn_id": first_turn,
+            }),
+            event("2026-01-01T00:00:04Z", "event_msg", {
+                "type": "task_started", "turn_id": second_turn,
+            }),
+        ])
+
+        record = telemetry.build_record(self.args())
+
+        self.assertEqual(record["runtime"]["task_starts"], 2)
+        self.assertEqual(record["runtime"]["task_completions"], 2)
+        self.assertEqual(record["sessions"]["complete"], 0)
+        self.assertEqual(record["sessions"]["incomplete"], 1)
+        self.assertEqual(record["sessions"]["latest_turn_states"], {"open": 1})
+        self.assertEqual(record["semantic_summary"]["outcome"], "accepted")
+        self.assertIn("out_of_order_events_sorted", record["warnings"])
+
+        self.write_session("root", [
+            event("2026-01-01T00:00:00Z", "session_meta", {"id": ROOT}),
+            event("2026-01-01T00:00:01Z", "event_msg", {"type": "task_started"}),
+            event("2026-01-01T00:00:02Z", "event_msg", {"type": "task_complete"}),
+            event("2026-01-01T00:00:03Z", "event_msg", {"type": "task_started"}),
+        ])
+        legacy_record = telemetry.build_record(self.args())
+        self.assertEqual(legacy_record["sessions"]["latest_turn_states"], {"open": 1})
+        self.assertEqual(legacy_record["sessions"]["complete"], 0)
+
+    def test_aborted_latest_turn_is_incomplete_and_window_end_is_partial(self):
+        turn_id = "01a00000-0000-7000-8000-000000000003"
+        self.write_session("root", [
+            event("2026-01-01T00:00:00Z", "session_meta", {"id": ROOT}),
+            event("2026-01-01T00:00:01Z", "event_msg", {
+                "type": "task_started", "turn_id": turn_id,
+            }),
+            event("2026-01-01T00:00:02Z", "event_msg", {
+                "type": "token_count",
+                "info": {"total_token_usage": {"total_tokens": 10}},
+            }),
+            event("2026-01-01T00:00:03Z", "event_msg", {
+                "type": "turn_aborted", "turn_id": turn_id,
+            }),
+        ])
+        args = self.args()
+        args.window_start = "2026-01-01T00:00:00Z"
+        args.window_end = "2026-01-01T00:00:04Z"
+
+        record = telemetry.build_record(args)
+
+        self.assertEqual(record["sessions"]["latest_turn_states"], {"aborted": 1})
+        self.assertEqual(record["sessions"]["complete"], 0)
+        self.assertEqual(record["runtime"]["turn_aborts"], 1)
+        self.assertEqual(record["window"]["coverage"], "partial_segmented")
+        self.assertIn("window_end_between_token_snapshots", record["warnings"])
+
+    def test_window_uses_final_turn_state_and_preserves_window_event_counts(self):
+        first_turn = "01a00000-0000-7000-8000-000000000004"
+        second_turn = "01a00000-0000-7000-8000-000000000005"
+        records = [
+            event("2026-01-01T00:00:00Z", "session_meta", {"id": ROOT}),
+            event("2026-01-01T00:00:01Z", "event_msg", {
+                "type": "task_started", "turn_id": first_turn,
+            }),
+            event("2026-01-01T00:00:02Z", "event_msg", {
+                "type": "task_complete", "turn_id": first_turn,
+            }),
+            event("2026-01-01T00:00:03Z", "event_msg", {
+                "type": "token_count",
+                "info": {"total_token_usage": {"total_tokens": 10}},
+            }),
+            event("2026-01-01T00:00:04Z", "event_msg", {
+                "type": "task_started", "turn_id": second_turn,
+            }),
+        ]
+        self.write_session("root", records)
+        args = self.args()
+        args.window_start = "2026-01-01T00:00:03Z"
+        args.window_end = "2026-01-01T00:00:05Z"
+
+        open_record = telemetry.build_record(args)
+
+        self.assertEqual(open_record["runtime"]["task_starts"], 1)
+        self.assertEqual(open_record["runtime"]["task_completions"], 0)
+        self.assertEqual(open_record["sessions"]["latest_turn_states"], {"open": 1})
+        self.assertEqual(open_record["window"]["coverage"], "partial_segmented")
+
+        records.append(event("2026-01-01T00:00:05Z", "event_msg", {
+            "type": "task_complete", "turn_id": second_turn,
+        }))
+        self.write_session("root", records)
+        completed_record = telemetry.build_record(args)
+
+        self.assertEqual(completed_record["runtime"]["task_starts"], 1)
+        self.assertEqual(completed_record["runtime"]["task_completions"], 1)
+        self.assertEqual(
+            completed_record["sessions"]["latest_turn_states"], {"completed": 1}
+        )
+        self.assertEqual(completed_record["sessions"]["complete"], 1)
+        self.assertEqual(completed_record["window"]["coverage"], "exact_segmented")
+
     def test_window_delimits_cycle_root_and_direct_children(self):
         self.fixtures()
         args = self.args()
@@ -786,7 +897,7 @@ class TelemetryTests(unittest.TestCase):
                 "root_thread_id": ROOT,
                 "snapshot_end": f"2025-12-3{version}T00:00:00Z",
             }
-            for version in (1, 2, 3, 4)
+            for version in (1, 2, 3, 4, 5)
         ]
         target = self.base / "legacy.jsonl"
         target.write_text(
@@ -794,7 +905,7 @@ class TelemetryTests(unittest.TestCase):
             encoding="utf-8",
         )
         lines, records = telemetry.read_registry(target)
-        self.assertEqual(len(lines), 4)
+        self.assertEqual(len(lines), 5)
         for legacy in legacy_records:
             self.assertIn(
                 (

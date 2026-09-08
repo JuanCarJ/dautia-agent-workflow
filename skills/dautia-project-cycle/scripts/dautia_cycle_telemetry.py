@@ -18,8 +18,8 @@ import tempfile
 from typing import Any
 
 
-SCHEMA_VERSION = 5
-SUPPORTED_SCHEMA_VERSIONS = {1, 2, 3, 4, SCHEMA_VERSION}
+SCHEMA_VERSION = 6
+SUPPORTED_SCHEMA_VERSIONS = {1, 2, 3, 4, 5, SCHEMA_VERSION}
 SAFE_ID = re.compile(r"^[A-Za-z0-9._-]{1,80}$")
 UUID_LIKE = re.compile(r"^[A-Fa-f0-9-]{16,80}$")
 SKILL_PATH = re.compile(r"/([A-Za-z0-9._-]{1,80})/SKILL\.md(?:[\"'\\\s]|$)")
@@ -389,6 +389,80 @@ def add_token_values(target: collections.Counter[str], values: dict[str, int]) -
         target[key] += values.get(key, 0)
 
 
+def analyze_turn_lifecycle(
+    session: dict[str, Any], window_end: str | None = None
+) -> dict[str, str | None]:
+    """Return the latest identifiable runtime turn state at the boundary.
+
+    Turn identifiers keep a late terminal event for an older turn from closing a
+    newer open turn. Events without identifiers remain compatible with older
+    rollouts by applying their terminal state to the latest observed turn.
+    """
+    turns: dict[str, dict[str, str | None]] = {}
+    latest_turn: str | None = None
+    anonymous_turn = 0
+
+    for timestamp, _, kind, payload in session["events"]:
+        if window_end is not None and (not timestamp or timestamp > window_end):
+            continue
+        if kind != "event_msg":
+            continue
+        event_type = str(payload.get("type") or "").lower()
+        if event_type not in {
+            "task_started", "task_start", "task_complete", "turn_complete",
+            "turn_aborted", "task_aborted",
+        }:
+            continue
+        raw_turn_id = payload.get("turn_id")
+        turn_id = raw_turn_id if isinstance(raw_turn_id, str) and raw_turn_id else None
+
+        if event_type in ("task_started", "task_start"):
+            if turn_id is None:
+                anonymous_turn += 1
+                key = f"anonymous:{anonymous_turn}"
+            else:
+                key = f"identified:{turn_id}"
+            turns[key] = {"state": "open", "terminal_timestamp": None}
+            latest_turn = key
+            continue
+
+        terminal_state = (
+            "completed"
+            if event_type in ("task_complete", "turn_complete")
+            else "aborted"
+        )
+        if turn_id is not None:
+            key = f"identified:{turn_id}"
+            if key not in turns:
+                turns[key] = {
+                    "state": terminal_state,
+                    "terminal_timestamp": timestamp or None,
+                }
+                if (
+                    latest_turn is None
+                    or turns[latest_turn]["state"] != "open"
+                ):
+                    latest_turn = key
+                continue
+            turns[key] = {
+                "state": terminal_state,
+                "terminal_timestamp": timestamp or None,
+            }
+            continue
+
+        if latest_turn is None:
+            anonymous_turn += 1
+            latest_turn = f"anonymous:{anonymous_turn}"
+        turns[latest_turn] = {
+            "state": terminal_state,
+            "terminal_timestamp": timestamp or None,
+        }
+
+    if latest_turn is None:
+        return {"state": "unknown", "terminal_timestamp": None}
+    return turns[latest_turn]
+
+
 def analyze_token_profiles(
     session: dict[str, Any],
     window_start: str | None,
@@ -418,7 +492,15 @@ def analyze_token_profiles(
     missing_start_boundary = False
     exact_start_boundary = window_start is None
     token_at_window_end = window_end is None
-    completed_in_window = False
+    latest_turn = analyze_turn_lifecycle(session, window_end)
+    latest_turn_completed_in_window = bool(
+        latest_turn["state"] == "completed"
+        and latest_turn["terminal_timestamp"]
+        and (
+            window_start is None
+            or str(latest_turn["terminal_timestamp"]) >= window_start
+        )
+    )
     started_at = session_start(session)
     if window_start is not None and started_at is not None and started_at >= window_start:
         exact_start_boundary = True
@@ -506,8 +588,6 @@ def analyze_token_profiles(
         if kind != "event_msg":
             continue
         event_type = payload.get("type")
-        if event_type in ("task_complete", "turn_complete"):
-            completed_in_window = True
         if event_type != "token_count":
             continue
         current_tokens = token_value(payload)
@@ -561,7 +641,9 @@ def analyze_token_profiles(
         previous_token_timestamp = timestamp
 
     end_boundary_partial = bool(
-        window_end is not None and not token_at_window_end and not completed_in_window
+        window_end is not None
+        and not token_at_window_end
+        and not latest_turn_completed_in_window
     )
     if end_boundary_partial:
         unknown_gaps += 1
@@ -603,7 +685,7 @@ def analyze_session(
 ) -> dict[str, Any]:
     events = session["events"]
     token_profiles = analyze_token_profiles(session, window_start, window_end)
-    completed = False
+    latest_turn = analyze_turn_lifecycle(session, window_end)
     calls: set[str] = set()
     call_methods: dict[str, set[str]] = {}
     agent_wait_calls: set[str] = set()
@@ -666,7 +748,6 @@ def analyze_session(
                 polling_sequence = []
             if event_type in ("task_complete", "turn_complete"):
                 task_completions += 1
-                completed = True
         elif kind == "response_item":
             item_type = payload.get("type")
             if item_type in ("function_call", "custom_tool_call"):
@@ -800,7 +881,8 @@ def analyze_session(
         "token_coverage": token_profiles["coverage"],
         "token_start_boundary": token_profiles["start_boundary"],
         "token_end_boundary": token_profiles["end_boundary"],
-        "completed": completed,
+        "completed": latest_turn["state"] == "completed",
+        "latest_turn_state": latest_turn["state"],
         "tool_calls": len(calls),
         "tool_input_chars": tool_input_chars,
         "tool_output_chars": tool_output_chars,
@@ -1195,6 +1277,9 @@ def build_record(
     unique_skill_loads = {
         skill_name: 1 for skill_name in sorted(skill_references)
     }
+    latest_turn_states = collections.Counter(
+        analysis["latest_turn_state"] for analysis in analyses
+    )
     return {
         "schema_version": SCHEMA_VERSION,
         "generated_at": snapshot_end or utc_now(),
@@ -1242,6 +1327,8 @@ def build_record(
             "max_depth": max(child_depths, default=0),
             "complete": sum(1 for analysis in analyses if analysis["completed"]),
             "incomplete": sum(1 for analysis in analyses if not analysis["completed"]),
+            "completion_basis": "latest_identified_runtime_turn",
+            "latest_turn_states": dict(sorted(latest_turn_states.items())),
             "malformed_lines_skipped": sum(analysis["malformed"] for analysis in analyses),
         },
         "distributions": {

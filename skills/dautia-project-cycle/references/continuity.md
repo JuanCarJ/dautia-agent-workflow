@@ -41,6 +41,10 @@ ahorro automatico. Abrir tarea nueva por objetivo independiente o preferencia,
 con handoff vigente; no por un numero universal de turnos. Descartar planes
 reemplazados y outputs voluminosos sin olvidar restricciones del usuario.
 
+Al retomar desde otra tarea, reconciliar primero el ultimo acuerdo y CURRENT:
+destino, exclusiones y decisiones sustituidas. No reabrir una eleccion ya resuelta
+por un resumen incompleto; si la evidencia contradice el acuerdo, explicar el delta.
+
 ## Preservar diseño
 
 Antes de editar: localizar referencia aceptada, componentes/tokens, assets/copy,
@@ -74,3 +78,13 @@ referencia visual, exclusiones y comprobacion; no solo un resumen de conclusione
 El auditor accede a evidencia original. Un pendiente material no desaparece por
 tests verdes, un cambio de modelo ni una frase de cierre. Una decision nueva o
 contradiccion vuelve al responsable. No duplicar auditoria por cada correccion.
+
+Antes de despachar consumidores de un contrato compartido, transmitir los estados
+permitidos, permisos e invariantes resueltos y el negativo pertinente. Si una
+decision sigue abierta, avanzar solo bloques que no dependan de ella. No basta
+esperar al productor: sus decisiones deben llegar al encargo consumidor.
+
+Al cerrar, reconciliar las fronteras prometidas por nombre (recorrido, navegador,
+dispositivo o proveedor) con prueba ejecutada y candidato. Una frontera no probada
+queda pendiente con motivo; no desaparece porque otras suites pasen. Distinguir
+codigo integrado de aceptacion externa pendiente, sin ampliar autoridad para probarla.

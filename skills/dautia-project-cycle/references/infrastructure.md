@@ -30,6 +30,9 @@ Regresion con mocks/fakes; smoke real focal solo si cambia frontera, declarando
 capacidad, build, dispositivo, maximo de operaciones, cuota y parada. Reutilizar
 ruta Google Navigation; mismo criterio para Sign-In, APNs y StoreKit.
 Fuente, archive, upload, build procesado y distribucion son evidencias distintas.
+Cuando cambien empaquetado, configuracion o cache persistente, comprobar valores
+e identidades esperadas dentro del artefacto sin exponer secretos y probar el
+upgrade desde el estado anterior afectado; una instalacion limpia no lo sustituye.
 
 ## Hosts y proveedores
 
@@ -42,6 +45,9 @@ El mapa estable del proyecto contiene repo/codebase -> proveedor -> identidad no
 secreta -> ambiente -> writer -> procedimiento/check/rollback. Estado mutable:
 revision/despliegue/fecha de observacion/incidente/pendiente en CURRENT o proveedor.
 No extrapolar staging a produccion, mirror a cutover ni health a transaccion.
+Tras un cambio de configuracion viva, reconciliar CURRENT con el readback fechado
+y la frontera pendiente: habilitado no equivale a login, entrega o transaccion
+probados. Una respuesta fail-closed tampoco demuestra el camino de exito.
 DO/Railway/Vercel se operan con interfaz pertinente dentro del target autorizado;
 servicio instalado o MCP expuesto no concede provisioning o deploy.
 
