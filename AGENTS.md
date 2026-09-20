@@ -18,10 +18,14 @@ inventar Git/PR/specs de producto para una lectura operativa sencilla.
 
 ## Política de ejecución
 
-Sol 5.6 high es el principal y ejecutor predeterminado. La política versionada vive
+Sol 5.6 high sigue como principal. El implementador de un bloque definido y
+técnicamente manejable usa Sol medium; la ejecución exigente usa high. La política vive
 en `dautia-project-cycle/config/routing-policy.json`, no dentro del método de cada
-skill. No bajar esfuerzo por defecto ni cambiar silenciosamente el principal.
-Jev puede recomendar Sol high o una consulta Astra low/medium para análisis,
+skill. No confundir el default del principal con los perfiles de sus trabajadores.
+Antes de despachar, usar `dispatch-plan` y el destino verificado que devuelve;
+no reemplazarlo por el rol base ni inferir el modelo ejecutado por el solicitado.
+Jev puede recomendar medium/high para implementación preparada y Sol high o una
+consulta Astra low/medium para análisis,
 arquitectura, UX, auditoría, estrategia de pruebas o diagnóstico que lo justifique.
 No elegir Astra por el nombre del rol, longitud del prompt o número de archivos.
 No usar Astra como escritor/operador automático ni como árbitro infalible.

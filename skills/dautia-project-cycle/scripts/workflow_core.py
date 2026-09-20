@@ -76,47 +76,111 @@ def policy() -> dict:
     return load_json((ROOT / "config/routing-policy.json").read_bytes())
 
 
+def role_default(role: str, rules: dict | None = None) -> str:
+    rules = rules or policy()
+    return rules.get("role_defaults", {}).get(role, rules["default_profile"])
+
+
+def role_profiles(role: str, rules: dict | None = None) -> list[str]:
+    """Finite renderable profiles. The effect gate still owns operation permission."""
+    rules = rules or policy()
+    if role not in READ_ROLES | WRITE_ROLES:
+        raise ContractError("unknown_role")
+    for key, entry in rules["profiles"].items():
+        if (not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", key) or not isinstance(entry, dict)
+                or entry.get("family") not in ("sol", "astra")
+                or not nonempty(entry.get("model")) or not nonempty(entry.get("effort"))):
+            raise ContractError("invalid_profile_definition")
+    return [key for key, profile in rules["profiles"].items()
+            if profile["family"] == "sol" or
+            (profile["family"] == "astra" and role in READ_ROLES and role in rules["analysis_roles"])]
+
+
+def routing_arguments(packet: dict) -> dict:
+    """Shared inputs for local selection, Jev and dispatch; do not drop host limits."""
+    w, rt = packet["work"], packet.get("runtime", {})
+    return dict(role=w["role"], operation=w["operation"], analysis=w.get("analysis", False),
+                available=rt.get("available_profiles"), denied=rt.get("denied_profiles"),
+                explicit=rt.get("explicit_override"), principal_choice=rt.get("principal_choice"),
+                required_capabilities=w.get("required_capabilities"),
+                available_capabilities=packet.get("available_capabilities"),
+                within_budget=packet.get("control", {}).get("budget_remaining", True) is not False,
+                decisions_resolved=w.get("decisions_resolved"),
+                execution_difficulty=w.get("execution_difficulty", "unknown"))
+
+
 def profile_selection(role: str, operation: str, *, analysis: bool,
                       recommendation: str | None = None, available: list[str] | None = None,
                       required_capabilities: list[str] | None = None,
                       available_capabilities: list[str] | None = None,
                       explicit: dict | None = None, denied: list[str] | None = None,
+                      principal_choice: dict | None = None,
                       shadow: bool = False, within_budget: bool = True,
+                      decisions_resolved: bool | None = None, execution_difficulty: str = "unknown",
                       rules: dict | None = None) -> dict:
-    """Select an eligible profile, not a dispatcher. Explicit overrides are bounded.
+    """Choose an eligible profile, never grant authority or claim a worker ran.
 
-    `explicit` must be bound by the caller to a real user directive; it is not
-    authorization inferred by this function. Unknown availability never becomes
-    an observed model. No fallback silently changes an explicit request.
+    Prepared implementation can use medium/high. Missing or open decisions need
+    preparation, not extra model effort. Difficulty unknown uses high as fallback
+    but permits Jev to assess medium/high. Explicit overrides do not bypass this.
     """
     rules = rules or policy()
     if role not in READ_ROLES | WRITE_ROLES or operation not in OPERATIONS:
         raise ContractError("unknown_role_or_operation")
-    base = rules["default_profile"]
+    if type(analysis) is not bool or decisions_resolved is not None and type(decisions_resolved) is not bool:
+        raise ContractError("invalid_routing_boolean")
+    if execution_difficulty not in ("routine", "demanding", "unknown"):
+        raise ContractError("invalid_execution_difficulty")
+    for value in (available, denied, required_capabilities, available_capabilities):
+        if value is not None and (not isinstance(value, list) or any(not nonempty(x) for x in value)):
+            raise ContractError("invalid_routing_filter")
+    if explicit is not None and not isinstance(explicit, dict) or principal_choice is not None and not isinstance(principal_choice, dict):
+        raise ContractError("invalid_profile_choice")
+    base = role_default(role, rules)
     analytic = analysis and role in rules["analysis_roles"] and operation in rules["analysis_operations"]
-    candidates = list(rules["ordinary_analysis_profiles"] if analytic else [base])
-    denied = denied or []
+    implementing = role in rules.get("implementation_roles", []) and operation in rules.get("implementation_operations", [])
+    kind = "implementation" if implementing else "analysis" if analytic else "default"
+    candidates = list(rules["ordinary_analysis_profiles"] if analytic else
+                      rules.get("ordinary_implementation_profiles", [base]) if implementing else [base])
     requested = (explicit or {}).get("profile")
     reason, status = "default", "selected"
+    def blocked(code: str) -> dict:
+        return {"status": "blocked", "reason": code, "selected": None, "requested": requested,
+                "recommendation": recommendation, "candidates": candidates, "routing_kind": kind,
+                "provider_observed": None, "authorizes_action": False, "changes_parent": False}
+    if implementing:
+        if decisions_resolved is not True:
+            return blocked("implementation_decisions_unresolved" if decisions_resolved is False else "implementation_readiness_required")
+        if execution_difficulty != "routine":
+            base = rules["default_profile"]
+        if execution_difficulty == "demanding":
+            candidates = [p for p in candidates if p != "sol_medium"]
     if requested is not None:
         if requested not in rules["profiles"]:
-            return {"status": "blocked", "reason": "unknown_requested_profile", "selected": None, "requested": requested}
+            return blocked("unknown_requested_profile")
         if not refs((explicit or {}).get("source_refs")) or (explicit or {}).get("source_kind") != "user":
-            return {"status": "blocked", "reason": "override_source_required", "selected": None, "requested": requested}
+            return blocked("override_source_required")
         if rules["profiles"][requested]["family"] == "astra" and not analytic:
-            return {"status": "blocked", "reason": "astra_not_execution_candidate", "selected": None, "requested": requested}
+            return blocked("astra_not_execution_candidate")
         candidates.append(requested)
-    candidates = [p for p in dict.fromkeys(candidates) if p not in denied]
+    candidates = [p for p in dict.fromkeys(candidates) if p not in (denied or [])]
     if available is not None:
         candidates = [p for p in candidates if p in available]
     if required_capabilities and not set(required_capabilities).issubset(set(available_capabilities or [])):
-        return {"status": "blocked", "reason": "capability_unverified", "selected": None, "candidates": candidates}
+        return blocked("capability_unverified")
     if not within_budget:
-        return {"status": "blocked", "reason": "budget_unavailable", "selected": None, "candidates": candidates}
+        return blocked("budget_unavailable")
     if requested:
         if requested not in candidates or available is None:
-            return {"status": "blocked", "reason": "requested_profile_unavailable_or_unverified", "selected": None, "requested": requested, "candidates": candidates}
+            return blocked("requested_profile_unavailable_or_unverified")
         selected, reason = requested, "explicit_scoped_override"
+    elif principal_choice is not None:
+        chosen = principal_choice.get("profile")
+        if not refs(principal_choice.get("evidence_refs")):
+            return blocked("principal_choice_evidence_required")
+        if chosen not in candidates or rules["profiles"].get(chosen, {}).get("explicit_only"):
+            return blocked("principal_choice_not_eligible")
+        selected, reason = chosen, "principal_evidence_selection"
     elif recommendation in candidates and not shadow:
         selected, reason = recommendation, "advisory_applied"
     else:
@@ -125,12 +189,12 @@ def profile_selection(role: str, operation: str, *, analysis: bool,
         if recommendation and recommendation not in candidates:
             reason = "excluded_recommendation"
     if selected is None:
-        status, reason = "blocked", "default_unavailable_no_silent_escalation"
-    elif available is None:
+        return blocked("default_unavailable_no_silent_escalation")
+    if available is None:
         status = "availability_unverified"
     return {"status": status, "selected": selected, "requested": requested,
             "recommendation": recommendation, "candidates": candidates, "reason": reason,
-            "profile": rules["profiles"].get(selected), "provider_observed": None,
+            "routing_kind": kind, "profile": rules["profiles"].get(selected), "provider_observed": None,
             "authorizes_action": False, "changes_parent": False}
 
 
@@ -145,7 +209,7 @@ def validate_packet(packet: Any) -> dict:
         raise ContractError("invalid_work")
     if work.get("role") not in READ_ROLES | WRITE_ROLES:
         raise ContractError("invalid_role")
-    for flag in ("material", "analysis", "bugfix", "security_opt_in", "prior_effect_unknown", "product_change", "external_required", "target_verified", "host_key_verified"):
+    for flag in ("material", "analysis", "bugfix", "security_opt_in", "prior_effect_unknown", "product_change", "external_required", "target_verified", "host_key_verified", "decisions_resolved"):
         if flag in work and type(work[flag]) is not bool:
             raise ContractError("invalid_boolean_" + flag)
     for field in ("requirements", "test_expectations", "impacts", "sources", "skills", "checks", "pending", "delegations", "spec_changes", "findings", "workspaces"):

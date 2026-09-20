@@ -1,0 +1,114 @@
+#!/usr/bin/env python3
+"""Bind a routing decision to a generated native worker definition.
+
+The CLI prepares only. A host integration may pass its supported spawn callable
+into dispatch_prepared; no sockets, shell proxy, model API or hidden retry is used.
+A returned model is a runtime report, not independent provider attestation.
+"""
+from __future__ import annotations
+
+import hashlib
+from pathlib import Path
+import tomllib
+from typing import Callable
+
+from workflow_core import (ContractError, READ_ROLES, canonical, fingerprint, gate,
+                           policy, profile_selection, routing_arguments)
+from workflow_store import emit, safe_path
+
+
+def prepare_dispatch(packet: dict, decision: dict, agents_dir: Path) -> dict:
+    checked = gate(packet, 'dispatch')
+    if not checked['passed']:
+        raise ContractError('dispatch_packet_not_ready')
+    if packet['work']['role'] == 'principal':
+        raise ContractError('choose_a_worker_role_not_principal')
+    if (decision.get('stage') != 'route' or decision.get('context_hash') != fingerprint(packet)
+            or decision.get('policy_hash') != fingerprint(policy())):
+        raise ContractError('stale_or_unbound_routing_decision')
+    if decision.get('dispatch_blocked_reason'):
+        raise ContractError('resolve_analysis_before_dispatch')
+    selection = decision.get('selection', {})
+    selected = selection.get('selected')
+    if not selected or selection.get('status') != 'selected':
+        raise ContractError('profile_availability_unverified')
+    # Recheck eligibility independently of the name supplied by a caller.
+    expected = profile_selection(**routing_arguments(packet), recommendation=selected)
+    if expected.get('selected') != selected or expected['status'] != 'selected':
+        raise ContractError('ineligible_dispatch_profile')
+    target = packet['work']['role'] + '__' + selected
+    if decision.get('dispatch_target') != target:
+        raise ContractError('dispatch_target_mismatch')
+    runtime = packet.get('runtime', {})
+    if runtime.get('harness') != 'codex' or target not in runtime.get('available_targets', []):
+        raise ContractError('native_target_not_observed')
+    path = agents_dir / (target + '.toml')
+    safe_path(path)
+    if not path.is_file() or path.stat().st_size > 256_000:
+        raise ContractError('native_target_definition_missing')
+    raw = path.read_bytes()
+    try:
+        config = tomllib.loads(raw.decode('utf-8'))
+    except (UnicodeError, tomllib.TOMLDecodeError) as exc:
+        raise ContractError('invalid_native_target_definition') from exc
+    profile = policy()['profiles'][selected]
+    sandbox = 'read-only' if packet['work']['role'] in READ_ROLES else 'workspace-write'
+    if (config.get('name') != target or config.get('model') != profile['model']
+            or config.get('model_reasoning_effort') != profile['effort']
+            or config.get('sandbox_mode') != sandbox or not config.get('developer_instructions')):
+        raise ContractError('native_target_configuration_mismatch')
+    result = {'schema_version': 1, 'status': 'prepared', 'agent_type': target,
+              'profile_id': selected, 'model_requested': profile['model'], 'effort_requested': profile['effort'],
+              'definition_hash': hashlib.sha256(raw).hexdigest(), 'context_hash': fingerprint(packet),
+              'policy_hash': fingerprint(policy()), 'decision_hash': fingerprint(decision),
+              'dispatch_performed': False, 'model_reported': None, 'effort_reported': None,
+              'native_enforcement_verified': False, 'authorizes_action': False}
+    result['plan_hash'] = fingerprint(result)
+    return result
+
+
+def dispatch_prepared(packet: dict, decision: dict, prepared: dict, agents_dir: Path,
+                      spawn: Callable[[dict], dict], *, events_root: Path | None = None) -> dict:
+    """Consumer for an existing, authorized host's native spawn callable.
+
+    The host maps agent_type/message to its actual tool schema. A failure after
+    calling spawn is unknown outcome: reconcile; this function NEVER retries.
+    A CLI process cannot call the parent Codex tool, so it must not claim a spawn.
+    """
+    if packet.get('fixture_only') is True:
+        raise ContractError('synthetic_fixture_cannot_dispatch_real_worker')
+    current = prepare_dispatch(packet, decision, agents_dir)
+    if current['plan_hash'] != prepared.get('plan_hash'):
+        raise ContractError('dispatch_plan_changed')
+    event = {'objective_id': packet['objective_id'], 'project_id': packet['project_id'],
+             'profile_requested': current['profile_id'], 'profile_configured': current['profile_id'],
+             'context_hash': current['context_hash'], 'policy_hash': current['policy_hash'],
+             'observation_kind': 'host_adapter', 'authorizes_action': False}
+    if events_root is not None:
+        emit(events_root, dict(event, event_type='dispatch.requested', status='requested'), 'dispatch')
+    # Context goes to the worker, never into the statistical event stream.
+    message = 'Execute only this delegated packet within its authority; return evidence to the principal.\n' + canonical(packet).decode()
+    try:
+        returned = spawn({'agent_type': current['agent_type'], 'message': message})
+    except Exception:
+        return dict(current, status='dispatch_outcome_unknown', dispatch_performed=None,
+                    reason='reconcile_before_retry')
+    if not isinstance(returned, dict):
+        return dict(current, status='dispatch_outcome_unknown', dispatch_performed=None,
+                    reason='unrecognized_native_response')
+    child = returned.get('agent_id') or returned.get('thread_id') or returned.get('id')
+    if not isinstance(child, str) or not child:
+        return dict(current, status='dispatch_outcome_unknown', dispatch_performed=None,
+                    reason='native_child_identity_missing')
+    model, effort = returned.get('model'), returned.get('model_reasoning_effort')
+    mismatch = (model is not None and model != current['model_requested'] or
+                effort is not None and effort != current['effort_requested'])
+    result = dict(current, status='runtime_profile_mismatch' if mismatch else 'started',
+                  dispatch_performed=True, child_reference=child, model_reported=model,
+                  effort_reported=effort, delivery_received=False)
+    if events_root is not None:
+        # Only opaque correlation escapes into telemetry; no prompts or native IDs.
+        run = 'child-' + hashlib.sha256(child.encode()).hexdigest()[:24]
+        emit(events_root, dict(event, event_type='agent.started', status=result['status'], run_id=run,
+                               model_reported=model, effort_reported=effort), 'dispatch')
+    return result

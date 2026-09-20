@@ -27,7 +27,7 @@ import urllib.request
 from typing import Any, Callable
 import time
 
-from workflow_core import validate_packet, gate, fingerprint, profile_selection, ContractError, policy
+from workflow_core import validate_packet, gate, fingerprint, profile_selection, ContractError, policy, routing_arguments
 from workflow_store import emit, state_root
 
 STAGES = ('brief', 'impact', 'continuity', 'route', 'context', 'progress', 'closeout', 'action')
@@ -256,14 +256,13 @@ def build_request(stage: str, p: dict, cfg: dict) -> dict:
                 'covered': 'Treatment is explicit and consistent.', 'missing': 'A relevant part has no treatment.',
                 'contradictory': 'Evidence or treatment conflicts with the requirement.', 'unknown': 'Evidence insufficient.'})
     elif stage == 'route':
-        selection = profile_selection(p['work']['role'], p['work']['operation'], analysis=p['work'].get('analysis', False),
-                                      available=p.get('runtime', {}).get('available_profiles'))
-        if not any(x.startswith('astra_') for x in selection.get('candidates', [])):
+        selection = profile_selection(**routing_arguments(p))
+        if selection['status'] == 'blocked' or len(selection.get('candidates', [])) < 2:
             return {'model': cfg['model'], 'state': {}, 'questions': {}}
         questions = {
             'information': choice('Are accessible missing sources the main obstacle, rather than a hard reasoning problem?', {'sufficient': 'Enough prior evidence to characterize the problem.', 'retrieve': 'Specific accessible information is missing.', 'unknown': 'Cannot establish sufficiency.'}),
-            'decisions': choice('Which decisions remain open in this bounded analysis?', {'resolved': 'Apply established criteria.', 'focal': 'One bounded tradeoff or uncertainty.', 'coupled': 'Interdependent decisions across contracts/states.', 'unknown': 'Not established.'}),
-            'depth': choice('How demanding is the analysis after considering the supplied evidence? Do not use role, brand or file count as a proxy.', {'routine': 'Known pattern or direct comparison.', 'substantial': 'Several interacting constraints.', 'deep': 'A difficult causal chain or competing explanations.', 'unknown': 'Not established.'}),
+            'decisions': choice('Which product or architectural decisions remain open in this bounded assignment? Defined but technically difficult execution is still resolved.', {'resolved': 'Apply established criteria.', 'focal': 'One bounded tradeoff or uncertainty.', 'coupled': 'Interdependent decisions across contracts/states.', 'unknown': 'Not established.'}),
+            'depth': choice('How demanding is the bounded work after considering the supplied evidence? Separate technical execution difficulty from missing decisions. Do not use role, brand or file count as a proxy.', {'routine': 'Known pattern or direct comparison.', 'substantial': 'Several interacting constraints.', 'deep': 'A difficult causal chain or competing explanations.', 'unknown': 'Not established.'}),
             'contradictions': choice('Are material evidence conflicts present?', {'none': 'No material conflict identified.', 'focal': 'One localized conflict.', 'multiple': 'Interdependent conflicts invalidate the current explanation.', 'unknown': 'Insufficient evidence.'})}
     elif stage == 'context':
         for c in p.get('optional_context', []):
@@ -284,6 +283,9 @@ def build_request(stage: str, p: dict, cfg: dict) -> dict:
     fields = ('outcome', 'work', 'requirements', 'test_expectations', 'impacts', 'analysis_brief', 'decisions',
               'findings', 'pending', 'checks', 'completion_claim', 'proposed_action', 'new_message')
     state = {k: p[k] for k in fields if k in p}
+    if stage == 'route':
+        state['routing_kind'] = selection.get('routing_kind')
+        state['eligible_profiles'] = selection.get('candidates', [])
     request = {'model': cfg['model'], 'state': state, 'questions': questions}
     if len(dumps(request)) > cfg['max_request_bytes']:
         raise SupportError('request_budget_exceeded_split_explicitly')
@@ -312,10 +314,14 @@ def parse_response(raw: Any, request: dict) -> dict:
     return clean
 
 
-def recommend(answers: dict) -> str | None:
+def recommend(answers: dict, *, implementation: bool = False) -> str | None:
     vals = {k: v['choice'] for k, v in answers.items()}
     if vals.get('information') != 'sufficient' or 'unknown' in vals.values():
         return None
+    if implementation:
+        if vals.get('decisions') != 'resolved' or vals.get('contradictions') != 'none':
+            return None  # A writer does not resolve a new product/architecture decision.
+        return 'sol_medium' if vals.get('depth') == 'routine' else 'sol_high'
     # Initial, explicitly uncalibrated mapping. Never route by role alone.
     if vals.get('decisions') == 'coupled' or vals.get('contradictions') == 'multiple' or vals.get('depth') == 'deep':
         return 'astra_medium'
@@ -329,19 +335,21 @@ def evaluate(stage: str, packet: dict, cfg: dict, root: Path, *, allow_network: 
     validate_config(cfg); validate_packet(packet)
     w, runtime = packet['work'], packet.get('runtime', {})
     local = gate(packet, 'closeout' if stage == 'closeout' else 'preflight')
-    routing = dict(role=w['role'], operation=w['operation'], analysis=w.get('analysis', False),
-                   available=runtime.get('available_profiles'), denied=runtime.get('denied_profiles'),
-                   explicit=runtime.get('explicit_override'), within_budget=packet.get('control', {}).get('budget_remaining', True) is not False)
+    routing = routing_arguments(packet)
     initial = profile_selection(**routing)
     result = {'schema_version': 2, 'stage': stage, 'mode': cfg['mode'], 'status': 'local_only',
               'issues': local['issues'], 'answers': {}, 'recommended_profile': None, 'selection': initial,
               'dispatch_target': None, 'selected_context_ids': None, 'network_called': False, 'cache_hit': False,
               'dispatch_performed': False, 'authorizes_action': False, 'certifies_completion': False,
+              'context_hash': fingerprint(packet), 'policy_hash': fingerprint(policy()),
               'question_revision': cfg['question_revision'], 'effective_model': None, 'effective_effort': None, 'question_hash': None}
     started = time.monotonic()
     try:
         if stage not in STAGES:
             raise SupportError('unknown_stage')
+        if stage == 'route' and (initial['status'] == 'blocked' or initial.get('requested')
+                                 or initial.get('reason') == 'principal_evidence_selection'):
+            return result
         if cfg['mode'] == 'off' or not allow_network or not cfg['features'][stage]:
             return result
         request = build_request(stage, packet, cfg)
@@ -381,16 +389,15 @@ def evaluate(stage: str, packet: dict, cfg: dict, root: Path, *, allow_network: 
             result['status'] = 'abstain'; return result
         result['status'] = 'advisory'
         if stage == 'route':
-            suggestion = recommend(answers)
+            implementing = initial.get('routing_kind') == 'implementation'
+            use = cfg['mode'] == 'selective' and 'route' in cfg['apply_features'] and local['passed']
+            suggestion = recommend(answers, implementation=implementing)
             result['recommended_profile'] = suggestion
             if suggestion is None:
                 result['status'] = 'retrieve_evidence_or_abstain'
-            use = cfg['mode'] == 'selective' and 'route' in cfg['apply_features'] and local['passed']
+                if use:
+                    result['dispatch_blocked_reason'] = 'resolve_analysis_before_dispatch'
             result['selection'] = profile_selection(**routing, recommendation=suggestion, shadow=not use)
-            chosen = result['selection'].get('selected')
-            target = w['role'] if chosen == 'sol_high' else f'{w["role"]}__{chosen}'
-            if use and chosen and target in runtime.get('available_targets', []) and runtime.get('harness') == 'codex':
-                result['dispatch_target'] = target  # A prepared request, not a spawned worker.
         if stage == 'context':
             candidates = packet.get('optional_context', [])
             keep = {c['id'] for c in candidates if c['id'] not in answers or answers[c['id']]['choice'] != 'irrelevant'}
@@ -404,6 +411,14 @@ def evaluate(stage: str, packet: dict, cfg: dict, root: Path, *, allow_network: 
         result['reason'] = str(exc) if isinstance(exc, (SupportError, ContractError)) else 'local_or_response_error'
         return result
     finally:
+        # All paths, including off/shadow/fallback and explicit overrides, resolve
+        # the same stable qualified target. It is not proof of loaded config.
+        chosen = result['selection'].get('selected')
+        target = f'{w["role"]}__{chosen}' if chosen else None
+        if (stage == 'route' and local['passed'] and result['selection']['status'] == 'selected'
+                and not result.get('dispatch_blocked_reason') and runtime.get('harness') == 'codex'
+                and target in runtime.get('available_targets', [])):
+            result['dispatch_target'] = target
         result['duration_ms'] = round((time.monotonic() - started) * 1000, 3)
         if events_root is not None:
             event = {'event_type': 'route.evaluated', 'objective_id': packet['objective_id'], 'project_id': packet['project_id'],

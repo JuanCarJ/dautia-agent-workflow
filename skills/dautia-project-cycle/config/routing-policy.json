@@ -1,20 +1,83 @@
 {
   "schema_version": 1,
-  "policy_revision": "r3.1",
+  "policy_revision": "r3.2",
   "default_profile": "sol_high",
-  "ordinary_analysis_profiles": ["sol_high", "astra_low", "astra_medium"],
-  "analysis_roles": ["principal", "code_explorer", "product_discovery", "systems_analyst", "ux_auditor", "independent_reviewer", "decision_gate", "data_security", "qa_web", "qa_ios", "qa_android", "qa_e2e", "documental"],
-  "analysis_operations": ["read", "write_artifact"],
+  "ordinary_analysis_profiles": [
+    "sol_high",
+    "astra_low",
+    "astra_medium"
+  ],
+  "analysis_roles": [
+    "principal",
+    "code_explorer",
+    "product_discovery",
+    "systems_analyst",
+    "ux_auditor",
+    "independent_reviewer",
+    "decision_gate",
+    "data_security",
+    "qa_web",
+    "qa_ios",
+    "qa_android",
+    "qa_e2e",
+    "documental"
+  ],
+  "analysis_operations": [
+    "read",
+    "write_artifact"
+  ],
   "profiles": {
-    "sol_high": {"model": "gpt-5.6-sol", "effort": "high", "family": "sol"},
-    "sol_medium": {"model": "gpt-5.6-sol", "effort": "medium", "family": "sol", "explicit_only": true},
-    "sol_xhigh": {"model": "gpt-5.6-sol", "effort": "xhigh", "family": "sol", "explicit_only": true},
-    "astra_low": {"model": "gpt-6-astra", "effort": "low", "family": "astra"},
-    "astra_medium": {"model": "gpt-6-astra", "effort": "medium", "family": "astra"},
-    "astra_high": {"model": "gpt-6-astra", "effort": "high", "family": "astra", "explicit_only": true}
+    "sol_high": {
+      "model": "gpt-5.6-sol",
+      "effort": "high",
+      "family": "sol"
+    },
+    "sol_medium": {
+      "model": "gpt-5.6-sol",
+      "effort": "medium",
+      "family": "sol"
+    },
+    "sol_xhigh": {
+      "model": "gpt-5.6-sol",
+      "effort": "xhigh",
+      "family": "sol",
+      "explicit_only": true
+    },
+    "astra_low": {
+      "model": "gpt-6-astra",
+      "effort": "low",
+      "family": "astra"
+    },
+    "astra_medium": {
+      "model": "gpt-6-astra",
+      "effort": "medium",
+      "family": "astra"
+    },
+    "astra_high": {
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "family": "astra",
+      "explicit_only": true
+    }
   },
   "astra_product_writes": false,
   "astra_external_operations": false,
   "default_changes_parent": false,
-  "model_claim_level": "configured_not_provider_verified"
+  "model_claim_level": "configured_not_provider_verified",
+  "role_defaults": {
+    "implementer": "sol_medium"
+  },
+  "implementation_roles": [
+    "implementer",
+    "implementer_complex",
+    "systems_implementer"
+  ],
+  "implementation_operations": [
+    "write_product",
+    "write_tests"
+  ],
+  "ordinary_implementation_profiles": [
+    "sol_medium",
+    "sol_high"
+  ]
 }

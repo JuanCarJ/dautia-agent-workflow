@@ -11,7 +11,7 @@ import shlex
 import sqlite3
 import sys
 from typing import Any
-from workflow_core import ContractError, gate, load_json, validate_packet, profile_selection, canonical, fingerprint
+from workflow_core import ContractError, gate, load_json, validate_packet, profile_selection, canonical, fingerprint, routing_arguments
 from workflow_store import state_root, atomic_write, read_private, bind, binding, resource_lease, emit, export_events
 from workspace_audit import snapshot, reconcile
 from skill_catalog import inventory
@@ -132,6 +132,7 @@ def main(argv: list[str] | None = None) -> int:
     b = sub.add_parser('bind'); b.add_argument('packet', type=Path); b.add_argument('--session', required=True); b.add_argument('--generation', required=True); b.add_argument('--cwd', required=True, type=Path)
     sub.add_parser('hook')
     r = sub.add_parser('route'); r.add_argument('packet', type=Path)
+    d = sub.add_parser('dispatch-plan'); d.add_argument('packet', type=Path); d.add_argument('--agents-dir', type=Path, required=True); d.add_argument('--cwd', type=Path, required=True); d.add_argument('--allow-network', action='store_true')
     s = sub.add_parser('snapshot'); s.add_argument('--repo', type=Path, required=True); s.add_argument('--repo-id', required=True); s.add_argument('--checkout-id', required=True)
     rec = sub.add_parser('reconcile'); rec.add_argument('before', type=Path); rec.add_argument('after', type=Path); rec.add_argument('--owned', nargs='*', default=[])
     c = sub.add_parser('catalog'); c.add_argument('roots', nargs='+', type=Path)
@@ -156,7 +157,16 @@ def main(argv: list[str] | None = None) -> int:
             result['telemetry']=packet_event(root,packet,'context.bound','bind','bound',generation=args.generation)
         elif args.command == 'route':
             p = validate_packet(read_input(args.packet)); w=p['work']; rt=p.get('runtime',{})
-            result = profile_selection(w['role'], w['operation'], analysis=w.get('analysis',False), available=rt.get('available_profiles'), explicit=rt.get('explicit_override'), denied=rt.get('denied_profiles'))
+            result = profile_selection(**routing_arguments(p))
+            code = 0 if result['status'] == 'selected' else 3
+        elif args.command == 'dispatch-plan':
+            from jev_support import evaluate, load_config, config_dir
+            from workflow_dispatch import prepare_dispatch
+            packet = refresh_sources(validate_packet(read_input(args.packet)), args.cwd)
+            cfg_root = config_dir()
+            decision = evaluate('route', packet, load_config(cfg_root), cfg_root,
+                                allow_network=args.allow_network, events_root=root)
+            result = prepare_dispatch(packet, decision, args.agents_dir)
         elif args.command == 'hook':
             raw = sys.stdin.buffer.read(256_001)
             if len(raw) > 256_000: raise ContractError('hook_input_budget_exceeded')
