@@ -1,58 +1,68 @@
-# DautIA Agent Workflow
+# DautIA Agent Workflow · contrato 15 / r3
 
-Fuente versionada del workflow agentico de DautIA. Es independiente de los
-repositorios de producto y puede instalarse en macOS o WSL para que Codex y
-Cursor compartan los mismos contratos, skills y roles sin compartir secretos.
+Workflow portable para Codex y Cursor, separado de los productos. Esta revisión es
+un candidato de piloto: controles ejecutables y pruebas locales no equivalen a
+validación real de modelos, Desktop, dispositivos o proveedores.
 
-## Que contiene
+Sol 5.6 high es el principal/ejecutor predeterminado. Jev puede asesorar análisis
+Sol/Astra sin autorizar acciones; las skills y los criterios no dependen de la marca.
+No se incorpora un fork de FirstMate ni un supervisor adicional.
 
-- `AGENTS.md`: contrato global, neutral respecto al harness y al modelo.
-- `skills/`: skills personales portables en el estandar `SKILL.md`.
-- `roles/`: definiciones canonicas de roles, sin fijar proveedor de modelo.
-- `adapters/`: representaciones generadas para Codex y Cursor.
-- `profiles/`: capacidades y routing propios de macOS y WSL.
-- `docs/`: arquitectura, operacion e instalacion.
-- `scripts/`: instalacion, diagnostico, render y validacion local.
+## Fuentes y generación
 
-Los proyectos conservan en sus propios repositorios `AGENTS.md`,
-`delivery.yaml`, documentacion funcional, migraciones y scripts de release.
-Este repositorio no contiene variables de entorno, tokens, passwords,
-certificados, sesiones ni memorias.
+- `AGENTS.md`: autoridad, modos y obligaciones comunes.
+- `skills/`: métodos, referencias y helpers.
+- `roles/`: los 16 roles canónicos y una frontera compartida `_boundary.md`.
+- `profiles/`: configuración de cada host; no prueba de capacidades disponibles.
+- `scripts/render_agents.py`: genera adaptadores desde esas fuentes al instalar.
+- `workflow-version.json`: versión del candidato y baseline.
 
-## Validacion rapida
+Los adaptadores generados dejaron de ser copias normativas mantenidas en Git:
+se generan en un directorio temporal/instalación. No copiar el workflow global a
+cada repositorio de producto. Los proyectos conservan sus specs, reglas, delivery,
+migraciones y procedimientos propios.
 
-```bash
+## Comprobar e instalar
+
+Python 3.11+, macOS o Linux/WSL. No se necesita SDK ni red para los tests.
+
+```sh
+python3 -m unittest discover -s tests -p 'test_*.py' -v
 python3 scripts/render_agents.py --check
 python3 scripts/check_portability.py
-python3 scripts/install.py --profile codex-macos --scope routing --check
+python3 scripts/install.py --profile codex-macos --scope workflow --check
 ```
 
-La comprobacion completa `--scope all --check` se ejecuta por separado y puede
-mostrar deriva historica en skills que no pertenecen al cambio de routing.
+El preview no modifica instalación. Tras reconciliar conflictos:
 
-Consulta [la arquitectura](docs/architecture.md) y la
-[instalacion en Windows](docs/windows-installation.md). La
-[matriz de proyectos](docs/project-migration-matrix.md) define que se migra y la
-[pauta de contratos](docs/project-contracts.md) evita copiar el workflow dentro
-de cada producto.
+```sh
+python3 scripts/install.py --profile codex-macos --scope workflow --configure-root --apply
+```
 
-Las rutas de instalacion siguen los mecanismos documentados de cada harness:
-Codex macOS conserva su home actual; Codex y Cursor en WSL comparten Agent Skills
-desde `~/.agents/skills`. El repositorio no instala plugins de Cursor.
+En WSL usar `--profile wsl-shared`; respeta CODEX_HOME y comparte skills en
+`~/.agents/skills`. Ediciones locales desconocidas bloquean la instalación: no usar
+`--adopt-existing` sin inspección; ese flag adopta exactamente los archivos previstos
+con respaldo. Nunca borra archivos ajenos. No modifica sesiones ni activa hooks.
 
-## Routing v13
+Guía: [setup y piloto](docs/r3-setup.md). Modelo/capacidades reales y hooks necesitan
+smoke en cada host. Cursor hereda su selector: no se anuncia paridad de routing.
 
-El alcance `python3 scripts/install.py --profile codex-macos --scope routing --apply`
-actualiza AGENTS, dautia-project-cycle y los 16 roles con respaldo. El check del
-mismo alcance demuestra solo esos assets; `--scope all --check` sigue mostrando
-la deriva historica de otras skills. No aplicar todo para corregir routing.
-La raiz debe estar en Sol high en la configuracion local; el instalador no edita
-config.toml ni cambia sesiones activas. Cursor hereda su selector, no garantiza
-los perfiles de Codex. Otros hosts requieren instalacion y validacion propias.
+## Jev
 
-Descubrimiento focal usa Astra low; implementacion sustantiva resuelta usa Sol
-medium con bloque independiente y trabajo concurrente util. Sol high implementa
-cuando quedan decisiones tecnicas acopladas; Astra medium cuando la incertidumbre
-es transversal o arquitectura y ejecucion siguen inseparables. La revision del
-head final sigue siendo independiente. Esta asignacion es una politica operativa,
-no evidencia de superioridad o ahorro.
+```sh
+dautia-jev setup --mode shadow --store-key
+dautia-jev doctor
+dautia-jev probe --allow-network
+```
+
+Sin setup queda off; la clave nunca va en Git/chat/argumentos. Probe envía contenido
+sintético y consume API. La precisión/umbrales requieren evaluación propia.
+
+## Multirepo y auditorías
+
+Delivery schema 3 admite ramas por repositorio y targets/proveedores por componente.
+Los validadores y la ejecución de credenciales v1/v2 se preservan en módulos legacy;
+no se migran productos automáticamente. Ver [contratos](docs/project-contracts.md).
+La auditoría Git se ingiere en lectura; no inicia limpieza o recuperación.
+[Estado de implementación](docs/r3-implementation.md) separa código, tests locales,
+pruebas pendientes de host y evidencia Git que todavía no se ha recibido.

@@ -1,0 +1,115 @@
+{
+  "schema_version": 3,
+  "objective_id": "obj1",
+  "project_id": "proj1",
+  "outcome": "Select without moving camera.",
+  "work": {
+    "mode": "IMPLEMENTATION",
+    "operation": "write_product",
+    "role": "implementer",
+    "analysis": false,
+    "material": true,
+    "target": "local"
+  },
+  "authority": {
+    "source_kind": "user",
+    "source_refs": [
+      "user-request-1"
+    ],
+    "project_id": "proj1",
+    "target": "local",
+    "operations": [
+      "write_product"
+    ],
+    "artifact_scope": "isolated-results"
+  },
+  "context_complete": true,
+  "coherence_evidence": [
+    "review-criteria-1"
+  ],
+  "requirements": [
+    {
+      "id": "R1",
+      "text": "Selection leaves camera unchanged.",
+      "expected": {
+        "camera_changed": false
+      }
+    }
+  ],
+  "test_expectations": [
+    {
+      "id": "T1",
+      "requirement_id": "R1",
+      "expected": {
+        "camera_changed": false
+      }
+    }
+  ],
+  "candidate": {
+    "repositories": {
+      "repo1": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "artifact_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "config_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "sources": [
+    {
+      "id": "spec1",
+      "expected_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "observed_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    }
+  ],
+  "skills": [
+    {
+      "id": "diagnosing-bugs",
+      "kind": "diagnosis",
+      "expected_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "loaded_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+  ],
+  "control": {
+    "budget_remaining": true
+  },
+  "runtime": {
+    "available_profiles": [
+      "sol_high",
+      "astra_low",
+      "astra_medium"
+    ],
+    "harness": "codex",
+    "available_targets": [
+      "systems_analyst",
+      "systems_analyst__astra_low",
+      "systems_analyst__astra_medium"
+    ]
+  },
+  "data_sharing": {
+    "approved": true,
+    "authority_ref": "synthetic-fixture-only"
+  },
+  "checks": [
+    {
+      "id": "C1",
+      "requirement_id": "R1",
+      "status": "passed",
+      "candidate_hash": "e4ea541b00b37c210b38462c2e3c2ec3d13192019588e44762a64fa287650ecf",
+      "acceptance_hash": "17fa86a0f211fe020904a54b8d24d04dd7ac23eecc907d71c9ca8c03cb668cf0",
+      "evidence_kind": "tool_result",
+      "evidence": [
+        "fixture-observation-1"
+      ]
+    }
+  ],
+  "review": {
+    "required": true,
+    "status": "approved",
+    "author_run": "author1",
+    "reviewer_run": "reviewer1",
+    "evidence": [
+      "review-1"
+    ],
+    "candidate_hash": "e4ea541b00b37c210b38462c2e3c2ec3d13192019588e44762a64fa287650ecf",
+    "acceptance_hash": "17fa86a0f211fe020904a54b8d24d04dd7ac23eecc907d71c9ca8c03cb668cf0"
+  },
+  "fixture_only": true
+}

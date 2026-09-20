@@ -1,0 +1,65 @@
+{
+  "schema_version": 3,
+  "project": "synthetic",
+  "product_topology": "multi-codebase",
+  "repository_layout": "multi-repo",
+  "configuration_status": "active",
+  "production_enabled": false,
+  "repositories": [
+    {
+      "id": "api",
+      "path": "api",
+      "integration_branch": "main"
+    },
+    {
+      "id": "ios",
+      "path": "ios",
+      "integration_branch": "dev"
+    }
+  ],
+  "codebases": [
+    {
+      "id": "api",
+      "repository": "api",
+      "path": ".",
+      "kind": "python",
+      "status": "active"
+    },
+    {
+      "id": "ios",
+      "repository": "ios",
+      "path": ".",
+      "kind": "swift",
+      "status": "active"
+    }
+  ],
+  "targets": [
+    {
+      "id": "api-integration",
+      "component": "api",
+      "environment": "integration",
+      "branch": "main",
+      "state": "observed",
+      "deploy_enabled": false,
+      "target": "api-local",
+      "checks": [
+        "unit"
+      ],
+      "rollback_ref": "previous-verified-candidate"
+    },
+    {
+      "id": "ios-integration",
+      "component": "ios",
+      "environment": "integration",
+      "branch": "dev",
+      "state": "observed",
+      "deploy_enabled": false,
+      "target": "ios-local",
+      "checks": [
+        "unit"
+      ],
+      "rollback_ref": "previous-verified-candidate"
+    }
+  ],
+  "provider_projects": []
+}

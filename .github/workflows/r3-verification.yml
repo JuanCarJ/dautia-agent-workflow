@@ -1,0 +1,24 @@
+name: DautIA r3 offline verification
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: r3-verification-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Verify Python and complete source
+        run: |
+          python3 -c 'import sys; assert sys.version_info >= (3, 11)'
+          python3 scripts/check_portability.py
+          python3 -m unittest discover -s tests -p 'test_*.py' -v
+      - name: No accidental repository edits
+        run: git diff --exit-code

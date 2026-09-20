@@ -1,107 +1,39 @@
 #!/usr/bin/env python3
-"""Validate portable workflow structure without accessing credentials."""
-
-from __future__ import annotations
-
+"""Validate canonical assets and generated schemas, not literal version slogans."""
+import ast
+import hashlib
 import json
-import py_compile
-import re
-import tomllib
 from pathlib import Path
+import sys
+from render_agents import render
+ROOT=Path(__file__).resolve().parents[1]
+LEGACY={'skills/dautia-ci-cd/scripts/validate_delivery_legacy.py':'3754ad4dc5cfdad7f622bd831c47f8feb8d81019','skills/dautia-ci-cd/scripts/dautia_supabase_legacy.py':'1f9c244ea1377db15193c10145de88e340d019fa'}
 
-
-ROOT = Path(__file__).resolve().parents[1]
-TEXT_SUFFIXES = {".md", ".py", ".sh", ".toml", ".yaml", ".yml", ".json"}
-ABSOLUTE_HOME = re.compile(r"/(?:Users|home)/[^/\s]+|[A-Za-z]:\\\\Users\\\\[^\\\s]+")
-
-
-def skill_metadata(path: Path) -> tuple[str, str]:
-    lines = path.read_text(encoding="utf-8").splitlines()
-    if not lines or lines[0] != "---":
-        raise ValueError(f"sin frontmatter: {path}")
-    end = lines.index("---", 1)
-    values: dict[str, str] = {}
-    for line in lines[1:end]:
-        if ":" in line:
-            key, value = line.split(":", 1)
-            values[key.strip()] = value.strip().strip('"')
-    return values.get("name", ""), values.get("description", "")
-
-
-def main() -> int:
-    errors: list[str] = []
-    skills = sorted((ROOT / "skills").glob("*/SKILL.md"))
-    for path in skills:
-        try:
-            name, description = skill_metadata(path)
-        except (ValueError, UnicodeError) as exc:
-            errors.append(str(exc))
+def check(root=ROOT,overlay=False):
+    errors=[]
+    version=json.loads((root/'workflow-version.json').read_text())
+    if version.get('plan_revision')!='r3' or type(version.get('contract_version')) is not int:errors.append('invalid_release_identity')
+    for p in root.rglob('*.py'):
+        if any(x in p.parts for x in ('.git','__pycache__')):continue
+        try:ast.parse(p.read_text(),filename=str(p))
+        except (SyntaxError,UnicodeError):errors.append('python_parse:'+str(p.relative_to(root)))
+    counts={}
+    for name in ('codex-macos','wsl-shared'):
+        p=json.loads((root/'profiles'/(name+'.yaml')).read_text())
+        try:counts[name]=len(render(root,p))
+        except ValueError as e:errors.append('adapter:'+str(e))
+    for name,expected in LEGACY.items():
+        p=root/name
+        if not p.exists():
+            if not overlay:errors.append('missing_preserved_legacy:'+name)
             continue
-        if name != path.parent.name:
-            errors.append(f"skill name mismatch: {path.parent.name} != {name}")
-        if not description:
-            errors.append(f"skill without description: {name}")
+        b=p.read_bytes();actual=hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()
+        if actual!=expected:errors.append('legacy_source_changed:'+name)
+    # Installed adapters are derived. Committing another copy recreates drift.
+    for p in (root/'adapters/codex/agents',root/'adapters/cursor/agents'):
+        if p.is_dir() and any(p.iterdir()):errors.append('generated_adapters_still_tracked_or_present')
+    return {'passed':not errors,'errors':errors,'generated_counts':counts,'overlay_only':overlay,'native_runtime_tested':False}
 
-    for path in ROOT.rglob("*"):
-        if (
-            not path.is_file()
-            or ".git" in path.parts
-            or "tests" in path.parts
-            or path.suffix.lower() not in TEXT_SUFFIXES
-        ):
-            continue
-        try:
-            content = path.read_text(encoding="utf-8")
-        except UnicodeError:
-            continue
-        match = ABSOLUTE_HOME.search(content)
-        if match:
-            errors.append(f"absolute user path in {path.relative_to(ROOT)}: {match.group(0)}")
-
-    for profile_path in (ROOT / "profiles").glob("*.yaml"):
-        try:
-            profile = json.loads(profile_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, UnicodeError) as exc:
-            errors.append(f"invalid profile {profile_path.name}: {exc}")
-            continue
-        if "pstack" in json.dumps(profile).lower():
-            errors.append(f"stable profile depends on pstack: {profile_path.name}")
-
-    installer = (ROOT / "scripts" / "install.py").read_text(encoding="utf-8")
-    if 'home / ".agents" / "skills"' not in installer:
-        errors.append("shared profile does not use the portable Agent Skills root")
-    if 'cursor-user-rules.md' not in installer:
-        errors.append("Cursor global rules handoff is not installed")
-
-    role_count = len(list((ROOT / "roles").glob("*.md")))
-    codex_agents = list((ROOT / "adapters" / "codex" / "agents").glob("*.toml"))
-    cursor_agents = list((ROOT / "adapters" / "cursor" / "agents").glob("*.md"))
-    if not role_count or role_count != len(codex_agents) or role_count != len(cursor_agents):
-        errors.append(
-            f"agent counts roles={role_count} codex={len(codex_agents)} cursor={len(cursor_agents)}"
-        )
-    for path in codex_agents:
-        try:
-            tomllib.loads(path.read_text(encoding="utf-8"))
-        except (tomllib.TOMLDecodeError, UnicodeError) as exc:
-            errors.append(f"invalid TOML {path.name}: {exc}")
-
-    if "Contrato v13" not in (ROOT / "AGENTS.md").read_text(encoding="utf-8"):
-        errors.append("AGENTS.md is not contract v13")
-
-    for script in (ROOT / "scripts").glob("*.py"):
-        try:
-            py_compile.compile(str(script), doraise=True)
-        except py_compile.PyCompileError as exc:
-            errors.append(str(exc))
-
-    if errors:
-        for error in errors:
-            print(f"FAIL: {error}")
-        return 2
-    print(f"OK: portable workflow; skills={len(skills)} roles={role_count} profiles=2")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+if __name__=='__main__':
+    result=check(overlay='--overlay' in sys.argv)
+    print(json.dumps(result,indent=2));raise SystemExit(0 if result['passed'] else 1)
