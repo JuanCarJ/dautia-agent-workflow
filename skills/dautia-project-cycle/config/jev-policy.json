@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "mode": "off",
+  "model": "jev-1.13.0",
+  "timeout_seconds": 5,
+  "max_request_bytes": 24000,
+  "max_response_bytes": 64000,
+  "max_questions": 16,
+  "max_requests_per_day": 100,
+  "max_requests_per_objective_per_day": 12,
+  "features": {
+    "brief": true,
+    "impact": true,
+    "continuity": true,
+    "route": true,
+    "context": true,
+    "progress": true,
+    "closeout": true,
+    "action": true
+  },
+  "min_confidence": {
+    "brief": 0.8,
+    "impact": 0.8,
+    "continuity": 0.8,
+    "route": 0.85,
+    "context": 0.95,
+    "progress": 0.8,
+    "closeout": 0.8,
+    "action": 0.8
+  },
+  "apply_features": [],
+  "question_revision": "r3.1",
+  "cache_ttl_seconds": 300
+}

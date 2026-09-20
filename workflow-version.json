@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "contract_version": 15,
+  "release": "15.0.0-rc1",
+  "plan_revision": "r3",
+  "base_commit": "720248e39c01093b76037de2ed9edfaae551f8c0",
+  "host_pilot_verified": false,
+  "jev_default": "off"
+}

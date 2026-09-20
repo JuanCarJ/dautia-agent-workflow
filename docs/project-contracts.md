@@ -1,68 +1,64 @@
-# Contrato minimo de un proyecto
+# Contratos de proyecto y entrega heterogénea
 
-Esta pauta sirve para incorporar un proyecto nuevo o migrar uno existente sin
-copiar el workflow global dentro del repositorio.
+El workflow global no se copia dentro de cada producto. AGENTS contiene límites
+locales y procedimientos; delivery identifica topología, ramas, componentes y
+entornos; CURRENT conserva únicamente estado observado que no deba consultarse
+en otra fuente vigente. No instalar aquí skills globales, sesiones o telemetría.
 
-## Archivos del producto
+## Compatibilidad
 
-- `AGENTS.md`: hechos locales, limites de dominio, comandos propios y
-  restricciones por plataforma. No duplica el contrato global.
-- `delivery.yaml`: repositorios, codebases, rama de integracion, ambientes,
-  checks, targets, provider refs no secretos y rollback.
-- `docs/CURRENT.md`: ultimo estado externo realmente comprobado. Puede omitirse
-  si el producto no tiene estado mutable externo.
-- documentacion funcional, arquitectura, datos y runbooks solo cuando el
-  comportamiento u operacion los necesite.
+Los contratos 1 y 2 conservan su validador exacto en validate_delivery_legacy.py.
+El esquema 3 añade ramas de integración por repositorio y targets por componente.
+No se migra ningún producto automáticamente. El ejemplo sintético se encuentra en
+`skills/dautia-project-cycle/examples/delivery-v3-multirepo.json`.
 
-No agregar `.agents/skills`, `.cursor/skills`, agentes globales, perfiles de
-modelo, telemetria del harness ni copias de este repositorio.
+El formato continúa siendo JSON compatible con YAML 1.2, no YAML arbitrario.
+Campos principales: schema_version=3, project, product_topology, repository_layout,
+configuration_status, production_enabled, repositories, codebases, targets y
+provider_projects opcional. Configuración draft deshabilita producción y contiene
+un motivo, no destinos que aparenten estar activos.
 
-## Migracion inicial
+Cada repository declara id/path/integration_branch. Cada codebase declara
+id/repository/path/kind/status y opcionalmente required_capabilities. Cada target
+vincula id/component/environment/state/deploy_enabled/target/checks/rollback_ref,
+y branch/provider cuando corresponda. El target integration coincide con la rama
+DE SU repositorio, no con una rama global. Cada componente activo tiene target de
+integración. El nombre main no concede despliegue y dev no es una rama universal.
 
-1. Identificar el repo canonico y descartar copias, worktrees y proyectos
-   retirados.
-2. Verificar remoto, rama de integracion, ramas de ambiente y proveedores sin
-   inferir deploys desde documentos.
-3. Crear o validar `delivery.yaml`. Si falta infraestructura esencial, dejarlo
-   `draft` con el bloqueo concreto; no inventar un contrato activo.
-4. Reconciliar `AGENTS.md` y `CURRENT.md` con codigo y proveedor observado.
-5. Validar localmente y publicar en la rama de integracion. Documentacion sola
-   usa `[skip ci]` cuando no existe un check remoto obligatorio.
-6. Registrar el producto en la matriz central; no copiar skills.
+provider_projects vincula id/provider/component/environment/target_id/workdir;
+workdir es relativo al repositorio del componente. Supabase añade project_ref,
+conserva validación específica y solo staging/production para estos destinos.
+Dos componentes pueden usar el mismo proveedor y entorno sin colisionar. Una
+selección ambigua se rechaza; nunca se escoge el primer destino silenciosamente.
+Los proveedores distintos se representan sin fingir que el validador los consultó.
 
-## Trabajo entre Mac y WSL
-
-- Cada host usa un clon independiente y credenciales propias.
-- Git sincroniza commits; nunca `.git`, worktrees, env, sesiones, caches,
-  certificados o artefactos de build.
-- Dos hosts no escriben la misma rama simultaneamente. El segundo parte de la
-  rama remota vigente o trabaja en una rama corta distinta.
-- Web, backend, Android, DB, docs y CLI de proveedores pueden ejecutarse en WSL
-  si `delivery.yaml` lo permite. iOS/Xcode/codesign/TestFlight/App Store se
-  cierran en Mac.
-
-## Implementacion y despliegue
-
-- Implementacion termina en la `integration_branch` de cada repo afectado.
-- Un push de integracion no concede deploy. Release fija SHA, ambiente, alcance,
-  proveedores, orden, rollback y condicion de parada.
-- En multi-repo, fijar todos los SHAs compatibles; no mezclar una version nueva
-  de un contrato con un consumidor viejo.
-- DB transporta migraciones inmutables, no filas. Aplicar por ambiente con
-  preflight, backup proporcional y reconciliacion.
-- Validar localmente por riesgo. GitHub Actions solo cuando sea gate requerido o
-  haga falta un runner que no exista localmente.
-
-El comando canonico de validacion es:
-
-```bash
-python3 ~/.codex/skills/dautia-ci-cd/scripts/validate_delivery.py \
-  delivery.yaml --repo .
+```sh
+python3 skills/dautia-ci-cd/scripts/validate_delivery.py delivery.yaml --repo .
+python3 skills/dautia-ci-cd/scripts/check_checkout.py delivery.yaml --repo . --json
+# Para varios destinos Supabase v3, después de verificar el contrato:
+# dautia-supabase --component backend --target-id backend-staging run --environment staging -- ...
 ```
 
-En WSL, donde las skills compartidas viven en `~/.agents/skills`, usa:
+Los comandos de Supabase y credenciales siguen perteneciendo al wrapper existente.
+Esta revisión cambia resolución de target, no concede DDL/MCP, psql ni nuevos
+fallbacks. Las consultas Git son locales: no certifican la frescura del remoto.
+check_checkout observa el espacio; su closeout requiere un packet de objetivo y no
+obliga a cambiar de rama a un hilo activo. La evidencia de integración se obtiene
+independientemente, no se inventa a partir de un status limpio.
 
-```bash
-python3 ~/.agents/skills/dautia-ci-cd/scripts/validate_delivery.py \
-  delivery.yaml --repo .
-```
+## Candidato y cierre
+
+Un cambio multirepo fija el conjunto compatible de revisiones, contratos,
+configuraciones y artefactos. Ordena integración/promoción por dependencias.
+Una variación material invalida solo evidencias dependientes. Un rollback entre
+proveedores no es una transacción atómica: explicitar compensaciones y límites.
+
+Config/operación sin Git usa host/servicio/fingerprint/readback, no PR ficticio.
+Mac y WSL conservan credenciales y herramientas propias. No se sincronizan .git,
+caches, certs, sesiones ni logs activos. iOS/Xcode requiere su host real; los
+fixtures de política en Linux no validan un dispositivo Apple.
+
+El output por cierre distingue cambio propio preservado/integrado, validación,
+estado externo y workspace reconciliado. Los cambios ajenos pueden seguir allí.
+Retirar un workspace exige revisar trabajo posterior, artefactos valiosos y uso
+activo; no se decide por la edad o por ver un PR merged.

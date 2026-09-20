@@ -1,181 +1,70 @@
 #!/usr/bin/env python3
-"""Render Codex and Cursor agent adapters from model-neutral role files."""
-
+"""Generate adapters at install time from canonical roles, not stale checked-in copies."""
 from __future__ import annotations
-
 import argparse
 import json
-import tempfile
-import tomllib
 from pathlib import Path
+import re
+import sys
+import tomllib
+
+ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(ROOT/'skills/dautia-project-cycle/scripts'))
+from skill_catalog import frontmatter
+from workflow_core import ContractError, policy
 
 
-ROOT = Path(__file__).resolve().parents[1]
-ROLE_DIR = ROOT / "roles"
-CODEX_DIR = ROOT / "adapters" / "codex" / "agents"
-CURSOR_DIR = ROOT / "adapters" / "cursor" / "agents"
-PROFILE_DIR = ROOT / "profiles"
-PROFILE_NAMES = ("codex-macos.yaml", "wsl-shared.yaml")
-
-READ_ONLY = {
-    "code_explorer",
-    "decision_gate",
-    "documental",
-    "independent_reviewer",
-    "product_discovery",
-    "qa_android",
-    "qa_e2e",
-    "qa_ios",
-    "qa_web",
-    "ux_auditor",
-}
-
-
-def neutralize(body: str) -> str:
-    return (
-        body.strip()
-        .replace("Return to root", "Return to the parent orchestrator")
-        .replace("Never spawn agents or delegate", "Never delegate")
-    )
-
-
-def bootstrap_roles() -> None:
-    ROLE_DIR.mkdir(parents=True, exist_ok=True)
-    for source in sorted(CODEX_DIR.glob("*.toml")):
-        target = ROLE_DIR / f"{source.stem}.md"
-        if target.exists():
-            continue
-        data = tomllib.loads(source.read_text(encoding="utf-8"))
-        metadata = {
-            "id": data["name"],
-            "description": data["description"],
-            "mutability": "read_only" if data["name"] in READ_ONLY else "bounded_write",
-        }
-        frontmatter = "\n".join(f"{key}: {json.dumps(value)}" for key, value in metadata.items())
-        target.write_text(
-            f"---\n{frontmatter}\n---\n{neutralize(data['developer_instructions'])}\n",
-            encoding="utf-8",
-        )
+def render(repo: Path, profile: dict) -> dict[str,bytes]:
+    rules=json.loads((repo/'skills/dautia-project-cycle/config/routing-policy.json').read_text())
+    boundary=(repo/'roles/_boundary.md').read_text()
+    result={}; seen=set()
+    for path in sorted((repo/'roles').glob('*.md')):
+        if path.name.startswith('_'):continue
+        meta,body=frontmatter(path.read_text());role=meta.get('id')
+        if role!=path.stem or not re.fullmatch(r'[a-z][a-z0-9_]*',str(role)) or role in seen:
+            raise ContractError('invalid_role_identity')
+        if meta.get('mutability') not in ('read_only','bounded_write') or not meta.get('description'):
+            raise ContractError('invalid_role_metadata')
+        if re.search(r'\b(?:Astra|Sol)\b',body):
+            raise ContractError('model_specific_role_body:'+role)
+        seen.add(role)
+        if profile['codex_agents'].get(role)!=['gpt-5.6-sol','high']:
+            raise ContractError('default_role_profile_must_be_sol_high:'+role)
+        profiles=['sol_high']
+        if role in rules['analysis_roles'] and meta['mutability']=='read_only':
+            profiles+=['astra_low','astra_medium','astra_high']
+        for key in profiles:
+            selected=rules['profiles'][key];name=role if key=='sol_high' else role+'__'+key
+            # Read-only is the conservative sandbox. Artifact-writing QA needs a
+            # separately verified artifact workspace/permission profile on the host.
+            values={'name':name,'description':meta['description']+(' Analysis-only; high requires explicit request.' if key!='sol_high' else ''),
+                    'model':selected['model'],'model_reasoning_effort':selected['effort'],
+                    'sandbox_mode':'read-only' if meta['mutability']=='read_only' else 'workspace-write',
+                    'developer_instructions':body+'\n'+boundary}
+            text='\n'.join(k+' = '+json.dumps(v,ensure_ascii=False) for k,v in values.items())+'\n'
+            tomllib.loads(text)
+            result['codex/'+name+'.toml']=text.encode()
+        cursor=role.replace('_','-')
+        text='---\nname: '+cursor+'\ndescription: '+json.dumps(meta['description'])+'\nmodel: inherit\nreadonly: '+str(meta['mutability']=='read_only').lower()+'\n---\n'+body+'\n'+boundary
+        result['cursor/'+cursor+'.md']=text.encode()
+    if set(profile['codex_agents'])!=seen:raise ContractError('profile_role_catalog_mismatch')
+    return result
 
 
-def read_role(path: Path) -> tuple[dict[str, str], str]:
-    lines = path.read_text(encoding="utf-8").splitlines()
-    if len(lines) < 5 or lines[0] != "---":
-        raise ValueError(f"Frontmatter invalido: {path}")
-    end = lines.index("---", 1)
-    metadata: dict[str, str] = {}
-    for line in lines[1:end]:
-        key, raw = line.split(":", 1)
-        metadata[key.strip()] = json.loads(raw.strip())
-    required = {"id", "description", "mutability"}
-    if required - metadata.keys():
-        raise ValueError(f"Faltan campos en {path}: {sorted(required - metadata.keys())}")
-    body = "\n".join(lines[end + 1 :]).strip() + "\n"
-    return metadata, body
-
-
-def load_model_map() -> dict[str, list[str]]:
-    profiles = [
-        json.loads((PROFILE_DIR / name).read_text(encoding="utf-8"))
-        for name in PROFILE_NAMES
-    ]
-    model_map = profiles[0]["codex_agents"]
-    for profile in profiles[1:]:
-        if profile["codex_agents"] != model_map:
-            raise ValueError(
-                "Los perfiles Codex deben mapear los roles al mismo modelo y esfuerzo: "
-                f"{profiles[0]['id']} != {profile['id']}"
-            )
-    return model_map
-
-
-def render_to(base: Path) -> None:
-    model_map = load_model_map()
-    codex_out = base / "codex"
-    cursor_out = base / "cursor"
-    codex_out.mkdir(parents=True, exist_ok=True)
-    cursor_out.mkdir(parents=True, exist_ok=True)
-
-    role_ids: set[str] = set()
-    for role_path in sorted(ROLE_DIR.glob("*.md")):
-        metadata, body = read_role(role_path)
-        role_id = metadata["id"]
-        role_ids.add(role_id)
-        if role_id not in model_map:
-            raise ValueError(f"El perfil no mapea el rol {role_id}")
-        if '"""' in body:
-            raise ValueError(f"El rol {role_id} contiene triple comilla no portable")
-        model, effort = model_map[role_id]
-        codex_text = (
-            f"name = {json.dumps(role_id)}\n"
-            f"description = {json.dumps(metadata['description'])}\n"
-            f"model = {json.dumps(model)}\n"
-            f"model_reasoning_effort = {json.dumps(effort)}\n"
-            f"developer_instructions = \"\"\"\n{body}\"\"\"\n"
-        )
-        (codex_out / f"{role_id}.toml").write_text(codex_text, encoding="utf-8")
-
-        cursor_id = role_id.replace("_", "-")
-        readonly = metadata["mutability"] == "read_only"
-        cursor_text = (
-            "---\n"
-            f"name: {cursor_id}\n"
-            f"description: {json.dumps(metadata['description'])}\n"
-            "model: inherit\n"
-            f"readonly: {'true' if readonly else 'false'}\n"
-            "---\n"
-            f"{body}"
-        )
-        (cursor_out / f"{cursor_id}.md").write_text(cursor_text, encoding="utf-8")
-
-    extra = set(model_map) - role_ids
-    if extra:
-        raise ValueError(f"El perfil contiene roles sin definicion: {sorted(extra)}")
-
-
-def compare_dirs(expected: Path, actual: Path) -> list[str]:
-    differences: list[str] = []
-    expected_files = {p.name: p.read_bytes() for p in expected.iterdir() if p.is_file()}
-    actual_files = {p.name: p.read_bytes() for p in actual.iterdir() if p.is_file()}
-    for name in sorted(set(expected_files) | set(actual_files)):
-        if expected_files.get(name) != actual_files.get(name):
-            differences.append(name)
-    return differences
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--bootstrap", action="store_true")
-    parser.add_argument("--render", action="store_true")
-    parser.add_argument("--check", action="store_true")
-    args = parser.parse_args()
-    if not any((args.bootstrap, args.render, args.check)):
-        parser.error("usa --bootstrap, --render o --check")
-    if args.bootstrap:
-        bootstrap_roles()
-    if args.render:
-        with tempfile.TemporaryDirectory() as raw:
-            temp = Path(raw)
-            render_to(temp)
-            CODEX_DIR.mkdir(parents=True, exist_ok=True)
-            CURSOR_DIR.mkdir(parents=True, exist_ok=True)
-            for target_dir, source_dir in ((CODEX_DIR, temp / "codex"), (CURSOR_DIR, temp / "cursor")):
-                for old in target_dir.iterdir():
-                    if old.is_file():
-                        old.unlink()
-                for source in source_dir.iterdir():
-                    (target_dir / source.name).write_bytes(source.read_bytes())
-    if args.check:
-        with tempfile.TemporaryDirectory() as raw:
-            temp = Path(raw)
-            render_to(temp)
-            differences = compare_dirs(temp / "codex", CODEX_DIR) + compare_dirs(temp / "cursor", CURSOR_DIR)
-        if differences:
-            print("Adapters desactualizados: " + ", ".join(sorted(differences)))
-            return 2
-        print(f"OK: {len(list(ROLE_DIR.glob('*.md')))} roles y ambos adapters sincronizados")
+def main():
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--check',action='store_true');p.add_argument('--output',type=Path);p.add_argument('--profile',default='codex-macos');p.add_argument('--render',action='store_true');a=p.parse_args()
+    if a.profile not in ('codex-macos','wsl-shared'):p.error('unknown profile')
+    profile=json.loads((ROOT/'profiles'/(a.profile+'.yaml')).read_text())
+    files=render(ROOT,profile)
+    if a.render and not a.output:p.error('--render requires --output outside the canonical adapter sources')
+    if a.output:
+        a.output.mkdir(parents=True,exist_ok=True)
+        for name,data in files.items():
+            dest=a.output/name
+            if dest.is_symlink():raise ContractError('adapter_symlink_refused')
+            dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(data)
+    print(json.dumps({'generated':len(files),'role_defaults':len(profile['codex_agents']),'source_validation':'passed','runtime_validated':False}))
     return 0
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+if __name__=='__main__':raise SystemExit(main())

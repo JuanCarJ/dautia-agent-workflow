@@ -1,67 +1,66 @@
-# Infraestructura compartida · v9
+# Infraestructura compartida — r3
 
-Leer solo la seccion del proveedor/host afectado. El proyecto conserva identidades,
-comandos propios, ramas y ambientes; esta referencia no prueba estado activo.
+Leer solo la frontera de proveedor/host afectada. Identidades y procedimientos
+pertenecen al proyecto; esta referencia no demuestra su estado externo actual.
+La selección de modelos pertenece únicamente a model-routing.md y su política.
 
 ## Supabase
 
-Autenticar una vez por host con dautia-supabase: sesion de cuenta y password DB
-por project_ref. El registro ~/.config/dautia/supabase-db-credentials.json usa
-0600; Mac importa una vez de Keychain, WSL lo completa en onboarding. No copiar
-secretos entre hosts, proyectos, argumentos, logs, Git o chat. Tokens publishable,
-service-role o access no sustituyen password DB. run --environment autoenlaza
-checkouts; activate repara contradicciones. Fuera de supabase login usar wrapper,
-nunca supabase directo, npx supabase, psql o version improvisada. Un prompt de
-clave repetido es fallo de onboarding/bypass; detenerlo, no pedirla de nuevo.
-Para comandos, consultar la referencia de credenciales de dautia-ci-cd.
+Conservar `dautia-supabase`, sesión de cuenta por host y password por project_ref.
+El registro protegido ~/.config/dautia/supabase-db-credentials.json usa 0600.
+No copiar secretos entre hosts, proyectos, argumentos, logs, Git o chat. Tokens
+publishable, service-role o access no sustituyen password DB. Ejecutar el wrapper
+fijado por el proyecto; nunca supabase/npx directo, psql o versión improvisada.
+Un prompt repetido revela onboarding/ACL/bypass pendiente, no permiso para pedir
+otra clave. Consultar solo la referencia de credenciales pertinente de CI/CD.
 
-Tests con DB requieren staging verificado; no DB local ni produccion. MCP es
-lectura; DDL via wrapper con autoridad de ambiente. Git transporta migraciones
-inmutables, no filas. Produccion exige identidad, historial, backup/PITR,
-compatibilidad y postflight; incompatible: expandir -> migrar -> contraer.
+Tests con DB requieren staging verificado, nunca DB local o producción. MCP es
+lectura; DDL versionado via wrapper con autoridad de ambiente. Git transporta
+migraciones inmutables, no filas. Producción requiere identidad, historial,
+backup/PITR, compatibilidad y postflight; usar expansión/migración/contracción si
+corresponde. Un esquema de delivery válido no acredita ninguna de esas ejecuciones.
 
-## Apple y movil
+## Apple y móvil
 
-Identidad y ACL de codesign se configuran una vez en Keychain. No guardar
-contrasenas/certificados en Git/env/argumentos/chat. Usar wrapper archive/export
-del proyecto; prompt recurrente de credencial implica bypass/ACL pendiente,
-sin reintentos. Mac posee Xcode, Simulator y signing; WSL no prueba iOS.
-Regresion con mocks/fakes; smoke real focal solo si cambia frontera, declarando
-capacidad, build, dispositivo, maximo de operaciones, cuota y parada. Reutilizar
-ruta Google Navigation; mismo criterio para Sign-In, APNs y StoreKit.
-Fuente, archive, upload, build procesado y distribucion son evidencias distintas.
-Cuando cambien empaquetado, configuracion o cache persistente, comprobar valores
-e identidades esperadas dentro del artefacto sin exponer secretos y probar el
-upgrade desde el estado anterior afectado; una instalacion limpia no lo sustituye.
+Codesign/ACL se prepara en Keychain; no publicar contraseñas o certificados. Usar
+el wrapper archive/export del proyecto, no introducir otro pipeline por una skill.
+Prompt recurrente implica una frontera de acceso, no reintentos infinitos.
+Mac posee Xcode, Simulator y firma; WSL no certifica iOS.
+
+Regresión amplia con mocks/fakes; smoke real focal cuando cambie la frontera, con
+build, dispositivo, provider mode, operaciones máximas, cuota y parada. Mantener
+Google Maps/Navigation, Sign-In, APNs o StoreKit según contrato real del producto.
+Una prueba offline no se presenta como live por conservar el mismo nombre de caso.
+Fuente, build instalado, archive, upload, procesamiento y distribución son estados
+distintos. Si cambian empaquetado/config/cache, inspeccionar el artefacto y el
+upgrade pertinente sin revelar secretos. Una instalación limpia no prueba upgrade.
+
+Un operador controla cada simulador/dispositivo/browser mutable. Otros auditores
+pueden leer evidencia o usar recursos aislados, no interferir con el gesto activo.
+QA que necesita preparar código/tests vuelve al principal para el escritor;
+completar lo automatizable antes de devolver únicamente la acción física pendiente.
 
 ## Hosts y proveedores
 
-Mac y WSL conservan credenciales/sesiones propias. WSL puede web/backend/docs/
-Android segun herramientas verificadas. Colima no esta disponible. No copiar
-caches, worktrees, binarios ni .env mediante Git. Un responsable de release fija
-(SHA, target, alcance, host); otros hosts aportan evidencia sin promover por su cuenta.
+Mac y WSL conservan credenciales/sesiones propias. No sincronizar por Git caches,
+worktrees, binarios o env. Colima permanece no disponible. Un operador de release
+posee candidato/target/alcance/host; otros hosts aportan pruebas, no promocionan.
 
-El mapa estable del proyecto contiene repo/codebase -> proveedor -> identidad no
-secreta -> ambiente -> writer -> procedimiento/check/rollback. Estado mutable:
-revision/despliegue/fecha de observacion/incidente/pendiente en CURRENT o proveedor.
-No extrapolar staging a produccion, mirror a cutover ni health a transaccion.
-Tras un cambio de configuracion viva, reconciliar CURRENT con el readback fechado
-y la frontera pendiente: habilitado no equivale a login, entrega o transaccion
-probados. Una respuesta fail-closed tampoco demuestra el camino de exito.
-DO/Railway/Vercel se operan con interfaz pertinente dentro del target autorizado;
-servicio instalado o MCP expuesto no concede provisioning o deploy.
+El mapa estable vincula repo/codebase/proveedor/entorno/identidad/procedimiento;
+el estado mutable tiene fecha y readback. No extrapolar staging a producción,
+mirror a cutover o health a transacción. Una respuesta fail-closed tampoco prueba
+el camino de éxito. No instalar/provisionar por tener una herramienta disponible.
 
-En `servidor_do_1`, un diagnostico focal puede hacerlo directamente el principal
-con Sol. El autor prepara codigo y un revisor independiente valida el head exacto;
-una mutacion remota autorizada la ejecuta un unico `release_operator` Sol medium.
-Astra entra solo por una decision transversal real. Verificar siempre alias,
-host, proyecto, ruta, servicio, candidato, rollback y readback; un fallo de acceso
-no autoriza cambiar de host, key, usuario o target.
+En servidor_do_1 se permite diagnóstico focal directo autorizado. Para SSH/SCP
+usar su alias con BatchMode=yes, StrictHostKeyChecking=yes, ConnectTimeout acotado
+y ConnectionAttempts=1. No revelar argumentos/env de procesos o logs crudos.
+Verificar host, proyecto, ruta, servicio, candidato, recuperación y resultado.
+Fallo de acceso no autoriza otro usuario, host, clave, proveedor o target.
 
-SSH y SCP usan exclusivamente el alias `servidor_do_1` con `BatchMode=yes`,
-`StrictHostKeyChecking=yes`, `ConnectTimeout` acotado y `ConnectionAttempts=1`. No exponer argumentos/env de
-procesos ni logs crudos. El Git remoto selecciona el SHA exactamente revisado y
-limpio, no un pull flotante. Un copied-tree usa allowlist/manifest propio del
-proyecto, excluye `.env*`, credenciales, sesiones y runtime de artefacto, backup
-y overlay, y verifica por readback cada archivo administrado. Sin borrado
-autorizado, un overlay es parcial; borrar solo paths removidos expresamente.
+Git remoto selecciona el SHA revisado, no pull flotante. Un copied-tree usa
+allowlist/manifest, excluye env/credenciales/sesiones/runtime y verifica readback.
+Borrar solo rutas removidas expresamente y con autoridad; un overlay sin esa
+reconciliación es parcial. Si una operación pudo tener efecto antes de fallar,
+reconciliar por identidad antes de repetirla. Nunca contabilizar/enviar dos veces
+para completar la evidencia. Config viva y computer-use tienen sus propias
+fronteras de lectura/guardar/enviar/publicar; no necesitan un PR ficticio.
