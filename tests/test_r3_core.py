@@ -380,12 +380,13 @@ class CatalogAndWorkspaceTests(unittest.TestCase):
         raw=b'1 .M N... 100644 100644 100644 a b file with spaces\0? newline\nfile\0'
         items=parse_status(raw);self.assertEqual(items[0]['path'],'file with spaces');self.assertEqual(items[1]['path'],'newline\nfile')
 
+    @patch.dict(os.environ, {'GIT_CONFIG_GLOBAL': os.devnull, 'GIT_CONFIG_SYSTEM': os.devnull, 'GIT_CONFIG_NOSYSTEM': '1'})
     def test_readonly_git_snapshot_preserves_foreign(self):
         with tempfile.TemporaryDirectory() as d:
             repo=Path(d);subprocess.run(['git','init','-q',d],check=True)
             f=repo/'foreign.txt';f.write_text('do not lose')
             before=snapshot(repo,'repo1','w1');after=snapshot(repo,'repo1','w1')
-            r=reconcile(before,after,[]);self.assertTrue(r['reconciled']);self.assertEqual(f.read_text(),'do not lose')
+            r=reconcile(before,after,[]);self.assertTrue(r['reconciled'], {'before': before, 'after': after, 'result': r});self.assertEqual(f.read_text(),'do not lose')
             (repo/'own.txt').write_text('work')
             r=reconcile(before,snapshot(repo,'repo1','w1'),['own.txt']);self.assertEqual(r['own_residual_paths'],['own.txt']);self.assertFalse(r['disposable'])
 
