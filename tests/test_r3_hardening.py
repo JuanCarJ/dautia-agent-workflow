@@ -44,6 +44,15 @@ class HardeningTests(unittest.TestCase):
             self.assertEqual(hook(dict(base,tool_input={'command':'ssh host1 uptime'}),root),{})
             result=hook(dict(base,tool_input={'command':'ssh host1 reboot'}),root)
             self.assertEqual(result['hookSpecificOutput']['permissionDecision'],'deny')
+    def test_prepared_local_read_is_exact_before_safe_shortcut(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);p=packet();p['work']['read_commands']=['cat README.md']
+            bind(root,'session',root,p,'one')
+            base={'hook_event_name':'PreToolUse','session_id':'session','cwd':str(root),'tool_name':'Bash'}
+            self.assertEqual(hook(dict(base,tool_input={'command':'cat README.md'}),root),{})
+            result=hook(dict(base,tool_input={'command':'cat .env'}),root)
+            self.assertEqual(result['hookSpecificOutput']['permissionDecision'],'deny')
+            self.assertIn('tool_effect_not_read_verified',result['hookSpecificOutput']['permissionDecisionReason'])
     def test_lease_concurrent_writers_have_one_winner(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d)

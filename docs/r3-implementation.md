@@ -57,7 +57,7 @@ El catálogo de 52 escenarios es una aceptación de plan, no 52 agentes ejecutad
 
 Pruebas locales stdlib unittest y repositorios temporales, mocks HTTP tipados,
 instalaciones de fixture con espacios/CODEX_HOME/WSL, rechazo de symlinks, rollback,
-conflictos y pausa. La batería completa actual ejecuta 104 pruebas y termina en OK;
+conflictos y pausa. La batería completa actual ejecuta 105 pruebas y termina en OK;
 el aplicador aislado ejecuta 11 pruebas y termina en OK. Portabilidad, render de los
 perfiles Codex/WSL y `git diff --check` también pasan. Durante la integración se
 detectó y corrigió la compatibilidad de los alias legítimos `/var` y `/tmp` de macOS

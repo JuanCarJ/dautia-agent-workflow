@@ -92,8 +92,6 @@ def hook(payload: dict, root: Path) -> dict:
         if tool not in ('Bash', 'apply_patch', 'Write', 'Edit', 'MultiEdit'):
             return {}
         inp = payload.get('tool_input', {})
-        if tool == 'Bash' and isinstance(inp, dict) and safe_read_command(inp.get('command', inp.get('cmd'))):
-            return {}
         result = gate(packet, 'preflight')
         packet_event(root,packet,'hook.observed','PreToolUse','passed' if result['passed'] else 'blocked')
         reasons = result['issues'][:]
