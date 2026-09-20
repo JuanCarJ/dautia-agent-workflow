@@ -53,6 +53,8 @@ class HardeningTests(unittest.TestCase):
             result=hook(dict(base,tool_input={'command':'cat .env'}),root)
             self.assertEqual(result['hookSpecificOutput']['permissionDecision'],'deny')
             self.assertIn('tool_effect_not_read_verified',result['hookSpecificOutput']['permissionDecisionReason'])
+            event=json.loads((root/'events'/'obj1'/'workflow.jsonl').read_text().splitlines()[-1])
+            self.assertEqual(event['status'],'blocked')
     def test_lease_concurrent_writers_have_one_winner(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d)

@@ -93,7 +93,6 @@ def hook(payload: dict, root: Path) -> dict:
             return {}
         inp = payload.get('tool_input', {})
         result = gate(packet, 'preflight')
-        packet_event(root,packet,'hook.observed','PreToolUse','passed' if result['passed'] else 'blocked')
         reasons = result['issues'][:]
         if packet['work']['operation'] == 'read':
             prepared = packet['work'].get('read_commands', [])
@@ -105,6 +104,7 @@ def hook(payload: dict, root: Path) -> dict:
                             and auth.get('project_id') == packet['project_id']
                             and auth.get('target') == packet['work'].get('target'))
             if not matched_read: reasons.append('tool_effect_not_read_verified')
+        packet_event(root,packet,'hook.observed','PreToolUse','passed' if not reasons else 'blocked')
         if reasons:
             return {'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'permissionDecision': 'deny',
                     'permissionDecisionReason': 'DautIA: ' + ','.join(sorted(set(reasons)))[:1800] + '. Resolve the bound task; no new authority is granted.'}}
