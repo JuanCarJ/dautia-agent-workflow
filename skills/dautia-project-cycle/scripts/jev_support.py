@@ -51,7 +51,7 @@ class SupportError(ValueError):
 # Stage projections keep optional decision support contextual. They are deliberately
 # smaller than a packet and never carry transcripts, prompts or private credentials.
 STAGE_FIELDS = {
-    'brief': ('objective_id', 'project_id', 'outcome', 'new_message', 'work'),
+    'brief': ('objective_id', 'project_id', 'outcome', 'work', 'requirements'),
     'impact': ('objective_id', 'project_id', 'outcome', 'work', 'requirements', 'impacts', 'sources'),
     'continuity': ('objective_id', 'project_id', 'outcome', 'candidate', 'spec_changes', 'decisions', 'authority', 'control'),
     'route': ('objective_id', 'project_id', 'outcome', 'work', 'requirements', 'runtime', 'authority', 'control'),
@@ -69,6 +69,31 @@ STAGE_REQUIRED = {
     'progress': ('objective_id', 'project_id', 'work', 'candidate'),
     'closeout': ('objective_id', 'project_id', 'candidate', 'requirements', 'checks', 'review'),
     'action': ('objective_id', 'project_id', 'work', 'authority'),
+}
+
+RECORD_FIELDS = {
+    'requirements': ('id', 'text', 'expected', 'required', 'allowed_evidence', 'provider_required', 'physical_required', 'oracle_required'),
+    'impacts': ('id', 'treatment', 'rationale', 'blocking', 'check_ids', 'evidence'),
+    'sources': ('id', 'kind', 'expected_hash', 'observed_hash'),
+    'skills': ('id', 'kind', 'required', 'expected_hash', 'loaded_hash'),
+    'spec_changes': ('id', 'classification', 'base_hash', 'delta', 'approval'),
+    'optional_context': ('id', 'kind', 'summary', 'group_id', 'recoverable', 'negative_evidence', 'pinned'),
+    'pending': ('id', 'required', 'status', 'authorized', 'available', 'monitor_confirmed'),
+    'delegations': ('id', 'required', 'state', 'candidate_hash', 'evidence'),
+    'findings': ('id', 'kind', 'summary', 'resolved', 'evidence'),
+    'test_expectations': ('id', 'requirement_id', 'expected'),
+    'checks': ('id', 'requirement_id', 'status', 'candidate_hash', 'acceptance_hash', 'evidence_kind', 'evidence', 'provider_live', 'physical_device', 'fail_before', 'prior_failed', 'failure_resolution'),
+}
+OBJECT_FIELDS = {
+    'work': ('mode', 'operation', 'role', 'material', 'analysis', 'bugfix', 'security_opt_in', 'product_change', 'external_required', 'decisions_resolved', 'execution_difficulty', 'required_capabilities', 'target', 'interface'),
+    'candidate': ('repositories', 'artifact_digest', 'config_digest', 'revision'),
+    'authority': ('source_kind', 'source_refs', 'project_id', 'target', 'operations', 'document_scope', 'artifact_scope'),
+    'control': ('state', 'budget_remaining', 'progress'),
+    'runtime': ('available_profiles', 'available_targets', 'harness'),
+    'review': ('required', 'status', 'candidate_hash', 'acceptance_hash', 'author_run', 'reviewer_run', 'unresolved_disagreement', 'evidence'),
+    'external': ('required', 'outcome', 'target'),
+    'release': ('authorized_candidate_hash', 'target'),
+    'proposed_action': ('kind', 'target', 'procedure', 'scope'),
 }
 
 
@@ -113,9 +138,23 @@ def project_stage_input(stage: str, packet: dict) -> tuple[dict, list[str]]:
     validate_packet(packet)
     if stage not in STAGES:
         raise SupportError('unknown_stage')
-    state = {key: copy.deepcopy(packet[key]) for key in STAGE_FIELDS[stage] if key in packet}
+    state = {}
+    for key in STAGE_FIELDS[stage]:
+        if key not in packet:
+            continue
+        value = packet[key]
+        if key in RECORD_FIELDS and isinstance(value, list):
+            state[key] = [_project_record(key, item) for item in value if isinstance(item, dict)]
+        elif key in OBJECT_FIELDS and isinstance(value, dict):
+            state[key] = {name: copy.deepcopy(value[name]) for name in OBJECT_FIELDS[key] if name in value}
+        elif key in ('objective_id', 'project_id', 'outcome', 'completion_claim', 'recovery'):
+            state[key] = copy.deepcopy(value)
     missing = [key for key in STAGE_REQUIRED[stage] if key not in packet]
     return state, missing
+
+
+def _project_record(kind: str, item: dict) -> dict:
+    return {key: copy.deepcopy(item[key]) for key in RECORD_FIELDS[kind] if key in item}
 
 
 def defaults() -> dict:
@@ -290,7 +329,8 @@ def build_request(stage: str, p: dict, cfg: dict) -> dict:
         return {'model': cfg['model'], 'state': {}, 'questions': {}}
     if stage in ('brief', 'impact'):
         for item in p.get('requirements' if stage == 'brief' else 'impacts', []):
-            questions[item['id']] = choice({'item': item, 'question': 'Is the item explicitly treated by the proposed plan, without contradiction?'}, {
+            kind = 'requirements' if stage == 'brief' else 'impacts'
+            questions[item['id']] = choice({'item': _project_record(kind, item), 'question': 'Is the item explicitly treated by the proposed plan, without contradiction?'}, {
                 'covered': 'Treatment is explicit and consistent.', 'missing': 'A relevant part has no treatment.',
                 'contradictory': 'Evidence or treatment conflicts with the requirement.', 'unknown': 'Evidence insufficient.'})
     elif stage == 'route':
@@ -306,7 +346,7 @@ def build_request(stage: str, p: dict, cfg: dict) -> dict:
         for c in p.get('optional_context', []):
             if c.get('pinned') or c.get('negative_evidence') or c.get('recoverable') is not True:
                 continue
-            questions[c['id']] = choice({'candidate': c, 'question': 'Is this optional recoverable context relevant to the bounded work?'}, {'needed':'Relevant to goal or constraint.', 'irrelevant':'Clearly unrelated.', 'unknown':'May still matter.'})
+            questions[c['id']] = choice({'candidate': _project_record('optional_context', c), 'question': 'Is this optional recoverable context relevant to the bounded work?'}, {'needed':'Relevant to goal or constraint.', 'irrelevant':'Clearly unrelated.', 'unknown':'May still matter.'})
     else:
         prompts = {
             'continuity': ('Compare the proposed clarification with approved decisions. Classification is not approval.', {'consistent':'Consistent refinement.', 'conflict':'Replaces or conflicts with an approved decision.', 'proposal':'Alternative not established as approved.', 'unknown':'Insufficient context.'}),
@@ -519,6 +559,10 @@ def main(argv: list[str] | None = None) -> int:
                     p = {'schema_version': 3, 'objective_id': 'synthetic-probe', 'project_id': 'synthetic',
                          'work': {'mode': 'DISCOVERY', 'role': 'principal', 'operation': 'read', 'material': True},
                          'outcome': 'Classify a synthetic alternative.', 'new_message': 'Consider a blue button.',
+                         'context_complete': True, 'coherence_evidence': ['synthetic-probe-contract'],
+                         'requirements': [{'id': 'probe-r1', 'text': 'Classify the supplied synthetic alternative.', 'expected': {'classification': 'typed'}, 'allowed_evidence': ['tool_result']}],
+                         'candidate': {'revision': 'synthetic-probe-v1'},
+                         'authority': {'source_kind': 'user', 'source_refs': ['explicit-synthetic-probe'], 'project_id': 'synthetic', 'target': 'none', 'operations': ['read']},
                          'data_sharing': {'approved': True, 'authority_ref': 'explicit-synthetic-probe'}}
                     cfg = copy.deepcopy(cfg); cfg['mode'] = 'shadow'; cfg['features']['continuity'] = True
                     stage = 'continuity'

@@ -305,7 +305,7 @@ def gate(packet: dict, stage: str = "preflight") -> dict:
                 name = component["component"]
                 if name in seen_components: issues.append("duplicate_component_evidence:" + name)
                 seen_components.add(name)
-                if not isinstance(component.get("repository"), str) or not re.fullmatch(r"[0-9a-fA-F]{7,64}", str(component.get("candidate_sha", ""))):
+                if not isinstance(component.get("repository"), str) or not component.get("repository") or not re.fullmatch(r"[0-9a-fA-F]{7,64}", str(component.get("candidate_sha", ""))):
                     issues.append("component_candidate_sha_required:" + name)
                 if component.get("status") not in ("independent", "dependent", "blocked"):
                     issues.append("invalid_component_status:" + name)

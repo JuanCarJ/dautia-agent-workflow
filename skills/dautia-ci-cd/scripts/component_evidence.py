@@ -15,7 +15,7 @@ def validate_component_evidence(evidence: Any, required_components: list[str] | 
         name = item['component']
         if name in seen: raise ContractError('duplicate_component_evidence')
         seen.add(name)
-        if not isinstance(item.get('repository'), str) or not re.fullmatch(r'[0-9a-fA-F]{7,64}', str(item.get('candidate_sha', ''))):
+        if not isinstance(item.get('repository'), str) or not item.get('repository') or not re.fullmatch(r'[0-9a-fA-F]{7,64}', str(item.get('candidate_sha', ''))):
             raise ContractError('component_candidate_sha_required')
         if item.get('status') not in ('independent', 'dependent', 'blocked'):
             raise ContractError('invalid_component_status')

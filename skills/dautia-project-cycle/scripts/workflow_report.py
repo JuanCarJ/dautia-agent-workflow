@@ -5,7 +5,7 @@ from pathlib import Path
 from workflow_store import export_events
 
 def report(root: Path, limit: int = 30) -> dict:
-    if not root.is_absolute() or limit < 1 or limit > 100:
+    if not root.is_absolute() or limit < 1 or limit > 30:
         raise ValueError('invalid_report_arguments')
     rows = []
     events_root = root / 'events'

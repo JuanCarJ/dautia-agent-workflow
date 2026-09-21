@@ -8,6 +8,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import fcntl
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -47,6 +50,26 @@ def _save(root: Path, value: dict) -> None:
     atomic_write(_path(root), canonical(value))
 
 
+@contextmanager
+def _ledger_lock(root: Path):
+    """Serialize local read-modify-write transitions on one host."""
+    if not root.is_absolute():
+        raise ContractError("ledger_root_must_be_absolute")
+    private_dir(root)
+    lock_path = root / "dispatch-ledger.lock"
+    safe_path(lock_path)
+    fd = os.open(lock_path, os.O_CREAT | os.O_RDWR | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    try:
+        os.fchmod(fd, 0o600)
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        finally:
+            os.close(fd)
+
+
 def reserve_dispatch(root: Path, *, objective_id: str, project_id: str, block_id: str,
                      attempt: str, profile: str, candidate_hash: str, packet_hash: str,
                      dispatch_key: str) -> dict:
@@ -56,24 +79,25 @@ def reserve_dispatch(root: Path, *, objective_id: str, project_id: str, block_id
     candidate_hash, packet_hash, dispatch_key = (_hash(candidate_hash, "candidate_hash"),
                                                 _hash(packet_hash, "packet_hash"),
                                                 _hash(dispatch_key, "dispatch_key"))
-    data = _load(root)
-    for item in data["dispatches"]:
-        if item.get("dispatch_key") != dispatch_key:
-            continue
-        if item.get("candidate_hash") != candidate_hash or item.get("packet_hash") != packet_hash:
-            return {"status": "reconcile_required", "reason": "dispatch_key_payload_changed", "dispatch": item}
-        if item.get("state") in ("reserved", "started", "delivered"):
-            return {"status": "reused", "reason": "identical_dispatch", "dispatch": item}
-        return {"status": "reconcile_required", "reason": "dispatch_state_unknown", "dispatch": item}
-    dispatch_id = "d-" + hashlib.sha256((dispatch_key + objective_id).encode()).hexdigest()[:24]
-    item = {"dispatch_id": dispatch_id, "objective_id": objective_id, "project_id": project_id,
-            "block_id": block_id, "attempt": attempt, "profile": profile,
-            "candidate_hash": candidate_hash, "packet_hash": packet_hash,
-            "dispatch_key": dispatch_key, "state": "reserved", "child_reference_hash": None,
-            "delivery_hash": None, "delivery": None}
-    data["dispatches"].append(item)
-    _save(root, data)
-    return {"status": "reserved", "dispatch": item}
+    with _ledger_lock(root):
+        data = _load(root)
+        for item in data["dispatches"]:
+            if item.get("dispatch_key") != dispatch_key:
+                continue
+            if item.get("candidate_hash") != candidate_hash or item.get("packet_hash") != packet_hash:
+                return {"status": "reconcile_required", "reason": "dispatch_key_payload_changed", "dispatch": item}
+            if item.get("state") in ("reserved", "started", "delivered"):
+                return {"status": "reused", "reason": "identical_dispatch", "dispatch": item}
+            return {"status": "reconcile_required", "reason": "dispatch_state_unknown", "dispatch": item}
+        dispatch_id = "d-" + hashlib.sha256((dispatch_key + objective_id).encode()).hexdigest()[:24]
+        item = {"dispatch_id": dispatch_id, "objective_id": objective_id, "project_id": project_id,
+                "block_id": block_id, "attempt": attempt, "profile": profile,
+                "candidate_hash": candidate_hash, "packet_hash": packet_hash,
+                "dispatch_key": dispatch_key, "state": "reserved", "child_reference_hash": None,
+                "delivery_hash": None, "delivery": None}
+        data["dispatches"].append(item)
+        _save(root, data)
+        return {"status": "reserved", "dispatch": item}
 
 
 def _find(data: dict, dispatch_id: str) -> dict:
@@ -85,30 +109,36 @@ def _find(data: dict, dispatch_id: str) -> dict:
 
 
 def mark_started(root: Path, dispatch_id: str, child_reference: str) -> dict:
-    data = _load(root); item = _find(data, dispatch_id); _check(child_reference, "child_reference")
-    if item["state"] not in ("reserved", "started"):
-        raise ContractError("dispatch_not_startable")
-    item["state"] = "started"
-    item["child_reference_hash"] = hashlib.sha256(child_reference.encode()).hexdigest()
-    _save(root, data)
-    return {"status": "started", "dispatch": item}
+    with _ledger_lock(root):
+        data = _load(root); item = _find(data, dispatch_id); _check(child_reference, "child_reference")
+        if item["state"] not in ("reserved", "started"):
+            raise ContractError("dispatch_not_startable")
+        item["state"] = "started"
+        item["child_reference_hash"] = hashlib.sha256(child_reference.encode()).hexdigest()
+        _save(root, data)
+        return {"status": "started", "dispatch": item}
 
 
 def record_delivery(root: Path, dispatch_id: str, *, candidate_hash: str, packet_hash: str,
                     delivery: dict, objective_state: str = "RUNNING") -> dict:
-    data = _load(root); item = _find(data, dispatch_id)
-    candidate_hash, packet_hash = _hash(candidate_hash, "candidate_hash"), _hash(packet_hash, "packet_hash")
-    if candidate_hash != item["candidate_hash"] or packet_hash != item["packet_hash"]:
-        item["state"] = "stale"; _save(root, data)
-        return {"status": "stale", "reason": "candidate_or_packet_changed", "dispatch": item}
-    if objective_state in ("PAUSED", "CANCELLED", "FAILED"):
-        return {"status": "late_ignored", "reason": "objective_not_running", "dispatch": item}
-    if not isinstance(delivery, dict):
-        raise ContractError("delivery_must_be_object")
-    item["state"] = "delivered"; item["delivery_hash"] = hashlib.sha256(canonical(delivery)).hexdigest()
-    item["delivery"] = {k: delivery[k] for k in ("status", "evidence", "summary", "candidate_hash") if k in delivery}
-    _save(root, data)
-    return {"status": "delivered", "dispatch": item}
+    with _ledger_lock(root):
+        data = _load(root); item = _find(data, dispatch_id)
+        if item["state"] == "stale":
+            return {"status": "stale", "reason": "stale_dispatch_is_terminal", "dispatch": item}
+        candidate_hash, packet_hash = _hash(candidate_hash, "candidate_hash"), _hash(packet_hash, "packet_hash")
+        if candidate_hash != item["candidate_hash"] or packet_hash != item["packet_hash"]:
+            item["state"] = "stale"; _save(root, data)
+            return {"status": "stale", "reason": "candidate_or_packet_changed", "dispatch": item}
+        if objective_state in ("PAUSED", "CANCELLED", "FAILED"):
+            return {"status": "late_ignored", "reason": "objective_not_running", "dispatch": item}
+        if item["state"] == "delivered":
+            return {"status": "already_delivered", "reason": "delivery_already_recorded", "dispatch": item}
+        if not isinstance(delivery, dict):
+            raise ContractError("delivery_must_be_object")
+        item["state"] = "delivered"; item["delivery_hash"] = hashlib.sha256(canonical(delivery)).hexdigest()
+        item["delivery"] = {k: delivery[k] for k in ("status", "evidence", "summary", "candidate_hash") if k in delivery}
+        _save(root, data)
+        return {"status": "delivered", "dispatch": item}
 
 
 def continuation(root: Path, dispatch_id: str, *, objective_state: str = "RUNNING",
