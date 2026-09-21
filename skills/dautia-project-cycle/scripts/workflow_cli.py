@@ -140,6 +140,11 @@ def main(argv: list[str] | None = None) -> int:
     l = sub.add_parser('lease'); l.add_argument('resource'); l.add_argument('--owner', required=True); l.add_argument('--generation', required=True); l.add_argument('--release', action='store_true')
     e = sub.add_parser('event'); e.add_argument('file', type=Path); e.add_argument('--emitter', default='workflow')
     ex = sub.add_parser('export'); ex.add_argument('objective'); ex.add_argument('--legacy-snapshot', type=Path)
+    qa = sub.add_parser('qa-prepare'); qa.add_argument('evidence_root', type=Path); qa.add_argument('--product-root', type=Path)
+    qw = sub.add_parser('qa-write'); qw.add_argument('evidence_root', type=Path); qw.add_argument('relative_path'); qw.add_argument('input', type=Path)
+    dl = sub.add_parser('delivery'); dl.add_argument('dispatch_id'); dl.add_argument('delivery', type=Path); dl.add_argument('--candidate-hash', required=True); dl.add_argument('--packet-hash', required=True); dl.add_argument('--objective-state', default='RUNNING')
+    dc = sub.add_parser('dispatch-continue'); dc.add_argument('dispatch_id'); dc.add_argument('--objective-state', default='RUNNING'); dc.add_argument('--no-budget', action='store_true')
+    rp = sub.add_parser('objective-report'); rp.add_argument('--limit', type=int, default=30)
     sub.add_parser('doctor')
     args = ap.parse_args(argv); root = args.state_root or state_root(); code = 0
     try:
@@ -185,6 +190,24 @@ def main(argv: list[str] | None = None) -> int:
                 load_json(data)
                 result['legacy_snapshot_sha256'] = hashlib.sha256(data).hexdigest()
                 result['legacy_snapshot_included'] = False
+        elif args.command == 'qa-prepare':
+            from qa_artifacts import prepare_workspace
+            result = prepare_workspace(root, args.evidence_root, args.product_root)
+        elif args.command == 'qa-write':
+            from qa_artifacts import write_evidence
+            result = write_evidence(args.evidence_root, args.relative_path, args.input.read_bytes())
+        elif args.command == 'delivery':
+            from workflow_delivery import record_delivery
+            result = record_delivery(root, args.dispatch_id, candidate_hash=args.candidate_hash,
+                                     packet_hash=args.packet_hash, delivery=read_input(args.delivery),
+                                     objective_state=args.objective_state)
+        elif args.command == 'dispatch-continue':
+            from workflow_delivery import continuation
+            result = continuation(root, args.dispatch_id, objective_state=args.objective_state,
+                                  budget_remaining=not args.no_budget)
+        elif args.command == 'objective-report':
+            from workflow_report import report
+            result = report(root, args.limit)
         else:
             result = {'contract_version':15,'storage_exists':root.exists(),'network_called':False,
                       'hook_coverage':'bound_root_objectives_supported_tools_only','native_runtime_tested':False,

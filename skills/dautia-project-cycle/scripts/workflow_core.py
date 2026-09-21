@@ -293,6 +293,31 @@ def gate(packet: dict, stage: str = "preflight") -> dict:
     operation, mode, role = w["operation"], w["mode"], w["role"]
     issues: list[str] = []
     warns: list[str] = []
+    component_evidence = packet.get("component_evidence")
+    if component_evidence is not None:
+        if not isinstance(component_evidence, list):
+            issues.append("component_evidence_must_be_list")
+        else:
+            seen_components = set()
+            for component in component_evidence:
+                if not isinstance(component, dict) or not isinstance(component.get("component"), str) or not component["component"]:
+                    issues.append("invalid_component_evidence"); continue
+                name = component["component"]
+                if name in seen_components: issues.append("duplicate_component_evidence:" + name)
+                seen_components.add(name)
+                if not isinstance(component.get("repository"), str) or not re.fullmatch(r"[0-9a-fA-F]{7,64}", str(component.get("candidate_sha", ""))):
+                    issues.append("component_candidate_sha_required:" + name)
+                if component.get("status") not in ("independent", "dependent", "blocked"):
+                    issues.append("invalid_component_status:" + name)
+                if not isinstance(component.get("checks", []), list) or not all(isinstance(x, str) and x for x in component.get("checks", [])):
+                    issues.append("invalid_component_checks:" + name)
+                if not isinstance(component.get("depends_on", []), list) or not all(isinstance(x, str) and x for x in component.get("depends_on", [])):
+                    issues.append("invalid_component_dependencies:" + name)
+            required_components = packet.get("required_components", [])
+            missing_components = sorted(set(required_components) - seen_components) if isinstance(required_components, list) else []
+            issues.extend("required_component_evidence_missing:" + x for x in missing_components)
+            if "contract_changed" in packet.get("shared_contracts", []) and any(not x.get("depends_on") for x in component_evidence if isinstance(x, dict)):
+                issues.append("shared_contract_dependency_missing")
     material = w.get("material", True) or operation in ("write_product", "write_tests", "git_write", "external_mutation")
     mutating = operation not in ("read",)
     authority = packet.get("authority", {})

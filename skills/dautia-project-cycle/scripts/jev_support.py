@@ -48,6 +48,30 @@ class SupportError(ValueError):
     """Safe public reason code. Never put raw payloads or credentials in it."""
 
 
+# Stage projections keep optional decision support contextual. They are deliberately
+# smaller than a packet and never carry transcripts, prompts or private credentials.
+STAGE_FIELDS = {
+    'brief': ('objective_id', 'project_id', 'outcome', 'new_message', 'work'),
+    'impact': ('objective_id', 'project_id', 'outcome', 'work', 'requirements', 'impacts', 'sources'),
+    'continuity': ('objective_id', 'project_id', 'outcome', 'candidate', 'spec_changes', 'decisions', 'authority', 'control'),
+    'route': ('objective_id', 'project_id', 'outcome', 'work', 'requirements', 'runtime', 'authority', 'control'),
+    'context': ('objective_id', 'project_id', 'outcome', 'work', 'requirements', 'optional_context', 'sources', 'skills'),
+    'progress': ('objective_id', 'project_id', 'outcome', 'work', 'candidate', 'pending', 'delegations', 'findings', 'control'),
+    'closeout': ('objective_id', 'project_id', 'outcome', 'completion_claim', 'work', 'candidate', 'requirements', 'test_expectations', 'checks', 'review', 'delegations', 'pending'),
+    'action': ('objective_id', 'project_id', 'outcome', 'work', 'authority', 'proposed_action', 'external', 'release', 'recovery'),
+}
+STAGE_REQUIRED = {
+    'brief': ('objective_id', 'project_id', 'work'),
+    'impact': ('objective_id', 'project_id', 'work', 'requirements'),
+    'continuity': ('objective_id', 'project_id', 'candidate', 'authority'),
+    'route': ('objective_id', 'project_id', 'work', 'runtime'),
+    'context': ('objective_id', 'project_id', 'work'),
+    'progress': ('objective_id', 'project_id', 'work', 'candidate'),
+    'closeout': ('objective_id', 'project_id', 'candidate', 'requirements', 'checks', 'review'),
+    'action': ('objective_id', 'project_id', 'work', 'authority'),
+}
+
+
 def text(x: Any) -> bool:
     return isinstance(x, str) and bool(x.strip())
 
@@ -78,6 +102,20 @@ def config_dir() -> Path:
     if not base.is_absolute():
         raise SupportError('config_root_must_be_absolute')
     return base / 'dautia'
+
+
+def project_stage_input(stage: str, packet: dict) -> tuple[dict, list[str]]:
+    """Return the minimum allow-listed state for one optional Jev stage.
+
+    Missing stage inputs cause an abstention at that stage. They do not mutate the
+    packet, grant authority or block the native workflow from continuing independently.
+    """
+    validate_packet(packet)
+    if stage not in STAGES:
+        raise SupportError('unknown_stage')
+    state = {key: copy.deepcopy(packet[key]) for key in STAGE_FIELDS[stage] if key in packet}
+    missing = [key for key in STAGE_REQUIRED[stage] if key not in packet]
+    return state, missing
 
 
 def defaults() -> dict:
@@ -279,14 +317,15 @@ def build_request(stage: str, p: dict, cfg: dict) -> dict:
         questions[stage] = choice(question, criteria)
     if len(questions) > cfg['max_questions']:
         raise SupportError('question_budget_exceeded_split_explicitly')
-    # Only this selected, explicitly authorized envelope leaves the host.
-    fields = ('outcome', 'work', 'requirements', 'test_expectations', 'impacts', 'analysis_brief', 'decisions',
-              'findings', 'pending', 'checks', 'completion_claim', 'proposed_action', 'new_message')
-    state = {k: p[k] for k in fields if k in p}
+    # Only the stage-specific, explicitly authorized envelope leaves the host.
+    state, missing = project_stage_input(stage, p)
     if stage == 'route':
         state['routing_kind'] = selection.get('routing_kind')
         state['eligible_profiles'] = selection.get('candidates', [])
     request = {'model': cfg['model'], 'state': state, 'questions': questions}
+    if missing:
+        request['state'] = {'abstention': 'stage_context_incomplete', 'missing': missing}
+        request['questions'] = {}
     if len(dumps(request)) > cfg['max_request_bytes']:
         raise SupportError('request_budget_exceeded_split_explicitly')
     return request
@@ -352,8 +391,17 @@ def evaluate(stage: str, packet: dict, cfg: dict, root: Path, *, allow_network: 
             return result
         if cfg['mode'] == 'off' or not allow_network or not cfg['features'][stage]:
             return result
+        # Inspect the source packet before projecting its stage envelope. A
+        # secret in an ignored/unknown field must still prevent any call.
+        if SECRET.search(dumps(packet).decode()):
+            raise SupportError('possible_secret_in_packet')
         request = build_request(stage, packet, cfg)
         result['question_hash'] = fingerprint(request['questions'])
+        if request.get('state', {}).get('abstention'):
+            result['status'] = 'abstain'
+            result['reason'] = request['state']['abstention']
+            result['missing_stage_inputs'] = request['state'].get('missing', [])
+            return result
         if not request['questions']:
             result['status'] = 'not_needed'; return result
         sharing = packet.get('data_sharing', {})
