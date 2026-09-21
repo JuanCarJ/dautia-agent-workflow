@@ -606,6 +606,11 @@ def gate(packet: dict, stage: str = "preflight") -> dict:
                         if (expected_profile.get("family") == "astra"
                                 and str(required_target).rsplit("__", 1)[0] not in policy().get("analysis_roles", [])):
                             issues.append("delegation_astra_role_not_analytic:" + child["id"])
+                        if expected_profile.get("explicit_only"):
+                            override = child.get("explicit_override")
+                            if (not isinstance(override, dict) or override.get("profile") != profile_id
+                                    or override.get("source_kind") != "user" or not refs(override.get("source_refs"))):
+                                issues.append("delegation_explicit_override_required:" + child["id"])
                         if child.get("model_observed") != expected_profile.get("model"):
                             issues.append("delegation_model_mismatch:" + child["id"])
                         if child.get("effort_observed") != expected_profile.get("effort"):

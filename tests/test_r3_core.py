@@ -306,6 +306,16 @@ class CoreTests(unittest.TestCase):
             'model_observed':'gpt-5.6-sol','effort_observed':'xhigh'})
         self.assertIn('dispatch_explicit_override_required', gate(p, 'closeout')['issues'])
 
+    def test_delegation_cannot_use_explicit_sol_profile_without_override(self):
+        p=packet('write_product', 'implementer', 'IMPLEMENTATION')
+        p['delegations']=[{'id':'analysis1','required':True,
+                           'required_agent_type':'systems_analyst__sol_xhigh',
+                           'agent_type':'systems_analyst__sol_xhigh','fork_turns':'none',
+                           'model_observed':'gpt-5.6-sol','effort_observed':'xhigh',
+                           'state':'received','candidate_hash':fingerprint(p['candidate']),
+                           'evidence':['analysis-1']}]
+        self.assertIn('delegation_explicit_override_required:analysis1', gate(p, 'closeout')['issues'])
+
     def test_team_preparation_before_user(self):
         p=packet();p['pending']=[{'id':'test1','status':'needs_team_handoff','authorized':True,'available':True}]
         self.assertEqual(next_action(p)['action'],'team_handoff');self.assertFalse(gate(p,'closeout')['passed'])
