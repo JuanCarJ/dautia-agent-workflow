@@ -599,9 +599,13 @@ def gate(packet: dict, stage: str = "preflight") -> dict:
                 if child.get("fork_turns") != "none":
                     issues.append("delegation_fork_turns_must_be_none:" + child["id"])
                 if "__" in str(required_target):
-                    profile_id = str(required_target).rsplit("__", 1)[1]
+                    target_role, profile_id = str(required_target).rsplit("__", 1)
+                    if target_role not in READ_ROLES | WRITE_ROLES:
+                        issues.append("delegation_agent_role_unknown:" + child["id"])
                     expected_profile = policy().get("profiles", {}).get(profile_id)
-                    if expected_profile:
+                    if not expected_profile:
+                        issues.append("delegation_profile_definition_missing:" + child["id"])
+                    else:
                         if (expected_profile.get("family") == "astra"
                                 and expected_profile.get("effort") not in ("low", "medium")):
                             issues.append("delegation_astra_effort_above_ceiling:" + child["id"])

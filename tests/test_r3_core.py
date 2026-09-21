@@ -324,6 +324,18 @@ class CoreTests(unittest.TestCase):
                            'evidence':['child-1']}]
         self.assertIn('delegation_agent_type_role_qualified_required:child1', gate(p, 'closeout')['issues'])
 
+    def test_delegation_rejects_unknown_role_or_profile(self):
+        p=packet('write_product', 'implementer', 'IMPLEMENTATION')
+        p['delegations']=[{'id':'child1','required':True,'required_agent_type':'foo__sol_high',
+                           'agent_type':'foo__sol_high','fork_turns':'none','state':'received',
+                           'candidate_hash':fingerprint(p['candidate']),
+                           'evidence':['child-1']}]
+        issues=gate(p, 'closeout')['issues']
+        self.assertIn('delegation_agent_role_unknown:child1', issues)
+        p['delegations'][0]['required_agent_type']='implementer__made_up'
+        p['delegations'][0]['agent_type']='implementer__made_up'
+        self.assertIn('delegation_profile_definition_missing:child1', gate(p, 'closeout')['issues'])
+
     def test_team_preparation_before_user(self):
         p=packet();p['pending']=[{'id':'test1','status':'needs_team_handoff','authorized':True,'available':True}]
         self.assertEqual(next_action(p)['action'],'team_handoff');self.assertFalse(gate(p,'closeout')['passed'])
