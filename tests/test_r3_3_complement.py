@@ -77,9 +77,12 @@ class ComplementTests(unittest.TestCase):
     def test_jev_projection_drops_unknown_private_fields(self):
         import jev_support as jev
         p = packet(); p['requirements'][0]['transcript'] = 'PRIVATE FULL CHAT'
+        p['requirements'][0]['expected']['private_transcript'] = 'SECRETCHAT'
+        p['requirements'][0]['expected']['nested'] = {'prompt': 'PRIVATE'}
         request = jev.build_request('brief', p, jev.defaults())
         rendered = json.dumps(request)
         self.assertNotIn('transcript', rendered); self.assertNotIn('PRIVATE FULL CHAT', rendered)
+        self.assertNotIn('SECRETCHAT', rendered); self.assertNotIn('PRIVATE', rendered)
 
 
 if __name__ == '__main__': unittest.main()

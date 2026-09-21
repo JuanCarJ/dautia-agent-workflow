@@ -84,6 +84,7 @@ RECORD_FIELDS = {
     'test_expectations': ('id', 'requirement_id', 'expected'),
     'checks': ('id', 'requirement_id', 'status', 'candidate_hash', 'acceptance_hash', 'evidence_kind', 'evidence', 'provider_live', 'physical_device', 'fail_before', 'prior_failed', 'failure_resolution'),
 }
+SENSITIVE_KEY = re.compile(r'(?i)(transcript|prompt|message|chat|private|secret|password|token|credential|cookie|raw|payload)')
 OBJECT_FIELDS = {
     'work': ('mode', 'operation', 'role', 'material', 'analysis', 'bugfix', 'security_opt_in', 'product_change', 'external_required', 'decisions_resolved', 'execution_difficulty', 'required_capabilities', 'target', 'interface'),
     'candidate': ('repositories', 'artifact_digest', 'config_digest', 'revision'),
@@ -146,15 +147,31 @@ def project_stage_input(stage: str, packet: dict) -> tuple[dict, list[str]]:
         if key in RECORD_FIELDS and isinstance(value, list):
             state[key] = [_project_record(key, item) for item in value if isinstance(item, dict)]
         elif key in OBJECT_FIELDS and isinstance(value, dict):
-            state[key] = {name: copy.deepcopy(value[name]) for name in OBJECT_FIELDS[key] if name in value}
+            state[key] = {name: _sanitize_value(value[name]) for name in OBJECT_FIELDS[key] if name in value}
         elif key in ('objective_id', 'project_id', 'outcome', 'completion_claim', 'recovery'):
-            state[key] = copy.deepcopy(value)
+            state[key] = _sanitize_value(value)
     missing = [key for key in STAGE_REQUIRED[stage] if key not in packet]
     return state, missing
 
 
 def _project_record(kind: str, item: dict) -> dict:
-    return {key: copy.deepcopy(item[key]) for key in RECORD_FIELDS[kind] if key in item}
+    return {key: _sanitize_value(item[key]) for key in RECORD_FIELDS[kind] if key in item}
+
+
+def _sanitize_value(value: Any, depth: int = 0) -> Any:
+    """Bound nested contract data and omit fields that could carry raw/private text."""
+    if depth > 5:
+        return None
+    if isinstance(value, dict):
+        return {key: _sanitize_value(val, depth + 1) for key, val in value.items()
+                if isinstance(key, str) and not SENSITIVE_KEY.search(key) and len(key) <= 80}
+    if isinstance(value, list):
+        return [_sanitize_value(item, depth + 1) for item in value[:64]]
+    if isinstance(value, str):
+        return value[:2000]
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    return None
 
 
 def defaults() -> dict:

@@ -29,7 +29,9 @@ def report(root: Path, limit: int = 30) -> dict:
                          'unknown_count': sum(e.get('status') in ('unknown', 'dispatch_outcome_unknown') for e in events),
                          'telemetry_warnings': exported.get('warnings', [])})
     rows.sort(key=lambda x: x.get('last_observed') or '', reverse=True)
-    return {'schema_version': 1, 'limit': limit, 'objectives': rows[:limit],
-            'observable_objectives': len(rows), 'coverage': 'event_stream_only',
+    limited = rows[:limit]
+    return {'schema_version': 1, 'limit': limit, 'objectives': limited,
+            'observable_objectives': len(limited), 'observable_objectives_total': len(rows),
+            'coverage': 'event_stream_only',
             'usage_aggregation': 'delegated_to_cycle_collector; no token re-sum',
             'unknowns_preserved': True, 'raw_prompts_included': False}
