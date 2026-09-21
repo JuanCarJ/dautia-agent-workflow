@@ -162,6 +162,9 @@ def profile_selection(role: str, operation: str, *, analysis: bool,
             return blocked("override_source_required")
         if rules["profiles"][requested]["family"] == "astra" and not analytic:
             return blocked("astra_not_execution_candidate")
+        if (rules["profiles"][requested]["family"] == "astra"
+                and rules["profiles"][requested].get("effort") not in ("low", "medium")):
+            return blocked("profile_above_astra_ceiling")
         candidates.append(requested)
     candidates = [p for p in dict.fromkeys(candidates) if p not in (denied or [])]
     if available is not None:
