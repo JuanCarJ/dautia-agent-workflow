@@ -70,6 +70,17 @@ record whether the decisions are resolved and whether execution is routine,
 demanding or unknown; unresolved decisions return to analysis before writing.
 Use the returned exact `agent_type` in the native spawn and pass the same context.
 Do not substitute the canonical role or silently inherit the parent's effort.
+A material delegation must persist `runtime.required_agent_type` and its terminal
+`runtime.dispatch_receipt`: exact role-qualified target, `fork_turns: "none"`,
+observed model/effort, child reference, `status: "completed"` and evidence.
+Generic `worker`/`code_explorer`, missing or mismatched profile, `fork_turns:
+"all"`, or capacity/incomplete child is a dispatch contract violation and blocks
+closeout; the principal cannot replace that receipt with its own artifact.
+For an explicitly broad visual scope (`work.visual_scope: broad|redesign`), retain
+the design baseline, real-viewport screenshots, responsive and accessibility
+checks, explicit visible-content checks (for example, an analysis explanation and
+its color mapping), and an independent `ux_auditor__PROFILE` handoff. Functional tests do not
+prove visual hierarchy, continuity with the existing design, or user impact.
 A prepared JSON request is not a spawned child: record its actual start/report and
 receive its delivery. The CLI does not intercept the native tool. A principal choice
 among ordinary eligible profiles requires explicit evidence and remains separate from

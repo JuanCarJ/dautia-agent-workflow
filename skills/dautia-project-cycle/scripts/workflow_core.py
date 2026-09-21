@@ -290,6 +290,113 @@ def next_action(packet: dict) -> dict:
     return {"action": "check_closeout", "reason": "no_known_required_pending"}
 
 
+def dispatch_receipt_issues(packet: dict, stage: str) -> list[str]:
+    """Check the terminal evidence for a required native delegation.
+
+    Dispatch preparation and execution are separate from closeout.  This gate
+    is opt-in through ``runtime.dispatch_required``/``required_agent_type`` so
+    trivial reads and packets that never delegated remain unchanged.
+    """
+    if stage not in ("closeout", "release"):
+        return []
+    runtime = packet.get("runtime", {})
+    required = runtime.get("dispatch_required") is True or nonempty(runtime.get("required_agent_type"))
+    if not required:
+        return []
+    issues: list[str] = []
+    target = runtime.get("required_agent_type")
+    if not nonempty(target):
+        issues.append("required_agent_type_missing")
+        return issues
+    receipt = runtime.get("dispatch_receipt")
+    if not isinstance(receipt, dict):
+        return ["dispatch_receipt_required"]
+    if receipt.get("agent_type") != target:
+        issues.append("dispatch_agent_type_mismatch")
+    if receipt.get("fork_turns") != "none":
+        issues.append("dispatch_fork_turns_must_be_none")
+    if receipt.get("status") != "completed":
+        issues.append("child_incomplete")
+    if not nonempty(receipt.get("child_reference")):
+        issues.append("dispatch_child_reference_required")
+    if not refs(receipt.get("evidence")):
+        issues.append("dispatch_terminal_evidence_required")
+    target_role, target_profile = target.rsplit("__", 1) if "__" in target else ("", "")
+    if target_role != packet.get("work", {}).get("role"):
+        issues.append("dispatch_target_role_mismatch")
+    expected_profile = runtime.get("required_profile")
+    if expected_profile != target_profile:
+        issues.append("dispatch_required_profile_mismatch")
+    expected_profile = target_profile
+    if expected_profile not in policy().get("profiles", {}):
+        issues.append("dispatch_profile_definition_missing")
+        return issues
+    expected = policy()["profiles"][expected_profile]
+    if (expected.get("family") == "astra"
+            and expected.get("effort") not in ("low", "medium")):
+        issues.append("dispatch_astra_effort_above_ceiling")
+    if (expected.get("family") == "astra"
+            and target_role not in policy().get("analysis_roles", [])):
+        issues.append("dispatch_astra_role_not_analytic")
+    if (expected.get("family") == "astra"
+            and not (packet.get("work", {}).get("analysis") is True
+                     and packet.get("work", {}).get("operation") in policy().get("analysis_operations", []))):
+        issues.append("dispatch_astra_requires_analysis")
+    if expected.get("explicit_only"):
+        override = runtime.get("explicit_override")
+        if (not isinstance(override, dict) or override.get("profile") != expected_profile
+                or override.get("source_kind") != "user" or not refs(override.get("source_refs"))):
+            issues.append("dispatch_explicit_override_required")
+    if receipt.get("model_observed") != expected.get("model"):
+        issues.append("dispatch_reported_model_mismatch")
+    if receipt.get("effort_observed") != expected.get("effort"):
+        issues.append("dispatch_reported_effort_mismatch")
+    return issues
+
+
+def visual_surface_issues(packet: dict, stage: str) -> list[str]:
+    """Require design and UX evidence for an explicitly broad visual change."""
+    if stage not in ("closeout", "release"):
+        return []
+    work = packet.get("work", {})
+    if work.get("visual_scope") not in ("broad", "redesign"):
+        return []
+    runtime = packet.get("runtime", {})
+    issues: list[str] = []
+    if not refs(runtime.get("design_baseline_evidence")):
+        issues.append("visual_design_baseline_required")
+    validation = runtime.get("visual_validation")
+    if not isinstance(validation, dict):
+        return issues + ["visual_validation_required"]
+    if not nonempty(validation.get("viewport")):
+        issues.append("visual_viewport_required")
+    if not refs(validation.get("screenshots")):
+        issues.append("visual_screenshot_evidence_required")
+    if not refs(validation.get("content_checks")):
+        issues.append("visual_content_acceptance_required")
+    if validation.get("responsive_checked") is not True:
+        issues.append("visual_responsive_check_required")
+    if validation.get("accessibility_checked") is not True:
+        issues.append("visual_accessibility_check_required")
+    candidate_hash = fingerprint(packet.get("candidate", {}))
+    valid_ux = []
+    for child in packet.get("delegations", []):
+        if not isinstance(child, dict) or not str(child.get("required_agent_type", "")).startswith("ux_auditor__"):
+            continue
+        target = child.get("required_agent_type")
+        profile_id = target.rsplit("__", 1)[1] if "__" in target else ""
+        expected = policy().get("profiles", {}).get(profile_id)
+        if (child.get("required") is True and child.get("state") == "received"
+                and child.get("agent_type") == target and child.get("fork_turns") == "none"
+                and refs(child.get("evidence")) and child.get("candidate_hash") == candidate_hash
+                and expected and child.get("model_observed") == expected.get("model")
+                and child.get("effort_observed") == expected.get("effort")):
+            valid_ux.append(child)
+    if not valid_ux:
+        issues.append("ux_auditor_delegation_required")
+    return issues
+
+
 def gate(packet: dict, stage: str = "preflight") -> dict:
     validate_packet(packet)
     if stage not in ("preflight", "dispatch", "closeout", "release"):
@@ -446,6 +553,8 @@ def gate(packet: dict, stage: str = "preflight") -> dict:
         if not nonempty(diagnostic.get("discriminating_check")):
             issues.append("discriminating_check_required")
     if stage in ("closeout", "release"):
+        issues.extend(dispatch_receipt_issues(packet, stage))
+        issues.extend(visual_surface_issues(packet, stage))
         candidate = packet.get("candidate", {})
         if material and not candidate:
             issues.append("candidate_identity_required")
@@ -483,6 +592,37 @@ def gate(packet: dict, stage: str = "preflight") -> dict:
         for child in packet.get("delegations", []):
             if child.get("required", True) and (child.get("state") != "received" or not refs(child.get("evidence")) or child.get("candidate_hash") != candidate_hash):
                 issues.append("handoff_missing_or_stale:" + child["id"])
+            required_target = child.get("required_agent_type")
+            if required_target:
+                if required_target in ("worker", "code_explorer") or "__" not in str(required_target):
+                    issues.append("delegation_agent_type_role_qualified_required:" + child["id"])
+                if child.get("agent_type") != required_target:
+                    issues.append("delegation_agent_type_mismatch:" + child["id"])
+                if child.get("fork_turns") != "none":
+                    issues.append("delegation_fork_turns_must_be_none:" + child["id"])
+                if "__" in str(required_target):
+                    target_role, profile_id = str(required_target).rsplit("__", 1)
+                    if target_role not in READ_ROLES | WRITE_ROLES:
+                        issues.append("delegation_agent_role_unknown:" + child["id"])
+                    expected_profile = policy().get("profiles", {}).get(profile_id)
+                    if not expected_profile:
+                        issues.append("delegation_profile_definition_missing:" + child["id"])
+                    else:
+                        if (expected_profile.get("family") == "astra"
+                                and expected_profile.get("effort") not in ("low", "medium")):
+                            issues.append("delegation_astra_effort_above_ceiling:" + child["id"])
+                        if (expected_profile.get("family") == "astra"
+                                and str(required_target).rsplit("__", 1)[0] not in policy().get("analysis_roles", [])):
+                            issues.append("delegation_astra_role_not_analytic:" + child["id"])
+                        if expected_profile.get("explicit_only"):
+                            override = child.get("explicit_override")
+                            if (not isinstance(override, dict) or override.get("profile") != profile_id
+                                    or override.get("source_kind") != "user" or not refs(override.get("source_refs"))):
+                                issues.append("delegation_explicit_override_required:" + child["id"])
+                        if child.get("model_observed") != expected_profile.get("model"):
+                            issues.append("delegation_model_mismatch:" + child["id"])
+                        if child.get("effort_observed") != expected_profile.get("effort"):
+                            issues.append("delegation_effort_mismatch:" + child["id"])
         review = packet.get("review", {})
         if review.get("required", False) or operation in ("write_product", "write_tests") or w.get("product_change") is True:
             if (review.get("status") != "approved" or not refs(review.get("evidence")) or
