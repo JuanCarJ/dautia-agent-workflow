@@ -54,11 +54,11 @@ class SupportError(ValueError):
 STAGE_FIELDS = {
     'brief': ('objective_id', 'project_id', 'outcome', 'work', 'requirements'),
     'impact': ('objective_id', 'project_id', 'outcome', 'work', 'requirements', 'impacts', 'sources'),
-    'continuity': ('objective_id', 'project_id', 'outcome', 'candidate', 'spec_changes', 'decisions', 'authority', 'control'),
+    'continuity': ('objective_id', 'project_id', 'outcome', 'new_message', 'candidate', 'spec_changes', 'decisions', 'authority', 'control'),
     # Routing needs the evidence frontier to distinguish routine execution from
     # genuinely unresolved analysis. These records remain field/depth bounded
     # by _project_record and _sanitize_value.
-    'route': ('objective_id', 'project_id', 'outcome', 'work', 'requirements', 'sources', 'impacts', 'pending', 'findings', 'runtime', 'authority', 'control'),
+    'route': ('objective_id', 'project_id', 'outcome', 'analysis_brief', 'work', 'requirements', 'sources', 'impacts', 'pending', 'findings', 'runtime', 'authority', 'control'),
     'context': ('objective_id', 'project_id', 'outcome', 'work', 'requirements', 'optional_context', 'sources', 'skills'),
     'progress': ('objective_id', 'project_id', 'outcome', 'work', 'candidate', 'pending', 'delegations', 'findings', 'control'),
     'closeout': ('objective_id', 'project_id', 'outcome', 'completion_claim', 'work', 'candidate', 'requirements', 'test_expectations', 'checks', 'review', 'delegations', 'pending'),
@@ -81,6 +81,7 @@ RECORD_FIELDS = {
     'sources': ('id', 'kind', 'expected_hash', 'observed_hash'),
     'skills': ('id', 'kind', 'required', 'expected_hash', 'loaded_hash'),
     'spec_changes': ('id', 'classification', 'base_hash', 'delta', 'approval'),
+    'decisions': ('id', 'status', 'summary', 'source_refs'),
     'optional_context': ('id', 'kind', 'summary', 'group_id', 'recoverable', 'negative_evidence', 'pinned'),
     'pending': ('id', 'required', 'status', 'authorized', 'available', 'monitor_confirmed'),
     'delegations': ('id', 'required', 'state', 'candidate_hash', 'evidence'),
@@ -152,7 +153,7 @@ def project_stage_input(stage: str, packet: dict) -> tuple[dict, list[str]]:
             state[key] = [_project_record(key, item) for item in value if isinstance(item, dict)]
         elif key in OBJECT_FIELDS and isinstance(value, dict):
             state[key] = {name: _sanitize_value(value[name]) for name in OBJECT_FIELDS[key] if name in value}
-        elif key in ('objective_id', 'project_id', 'outcome', 'completion_claim', 'recovery'):
+        elif key in ('objective_id', 'project_id', 'outcome', 'completion_claim', 'recovery', 'new_message', 'analysis_brief'):
             state[key] = _sanitize_value(value)
     missing = [key for key in STAGE_REQUIRED[stage] if key not in packet]
     return state, missing

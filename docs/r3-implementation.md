@@ -25,8 +25,11 @@ Jev, SSH, despliegues o Codex Desktop en esta implementación local.
   discovery no se etiqueta como carga/uso del agente.
 - delivery_v3: ramas por repo y destinos por componente; wrappers preservan los
   validadores/operadores originales para contratos anteriores.
-- generación/instalación: roles canónicos y boundary común, todos default Sol high,
-  variantes Astra analíticas y explicit-only para high. Sin copias derivadas
+- generación/instalación: roles canónicos y boundary común, principal y roles
+  analíticos con Sol high; implementadores definidos usan Sol medium para trabajo
+  rutinario y high cuando la dificultad lo exige. Las variantes Astra son
+  analíticas hasta medium; Astra high queda bloqueado por la política vigente
+  aunque exista una definición heredada. Sin copias derivadas
   versionadas que se puedan quedar obsoletas. Preview, conflictos, backup,
   reversión y paths Mac/WSL/codex personalizados; no activa hooks ni sesiones.
 

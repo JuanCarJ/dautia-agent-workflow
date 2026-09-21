@@ -36,8 +36,9 @@ role name, file count, brand or sensitivity alone. The mapping remains uncalibra
 `runtime.principal_choice = {"profile": "astra_medium", "evidence_refs": ["..."]}`
 allows the principal to select an ordinary eligible profile with evidence, including
 when Jev is off or shadow. This is not a user approval and grants no permissions.
-Explicit-only profiles such as Sol xhigh and Astra high require the separate
-`runtime.explicit_override` bound to a user directive. Availability, denied profiles,
+Sol xhigh requires the separate `runtime.explicit_override` bound to a user
+directive. Astra high is above the current workflow ceiling and remains blocked
+even when a legacy definition exists. Availability, denied profiles,
 capabilities and budget are checked before any external routing call. Missing
 availability remains unverified; no fabricated fallback profile is run.
 
@@ -77,6 +78,10 @@ host's spawn API. It revalidates the plan before making one callback and separat
 requested/configured/reported values, child start and delivery. Unknown spawn
 outcomes require reconciliation, never an automatic retry. No provider report is
 inferred from a configured model. A returned mismatch remains a mismatch.
+The dispatch ledger uses a stable identity derived from objective/block/attempt,
+packet context, policy, definition and selected profile; variable evaluation
+timing is audit metadata and cannot create a second child for the same work. A
+successful reservation exposes its `dispatch_id` for delivery readback.
 
 The standalone CLI cannot call a tool in its parent Codex thread. The native
 principal/tool binding still requires a host smoke; a JSON plan does not prove a

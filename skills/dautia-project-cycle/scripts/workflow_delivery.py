@@ -30,6 +30,15 @@ def _hash(value: Any, label: str) -> str:
     return value.lower()
 
 
+def _objective_state(value: str) -> str:
+    if not isinstance(value, str):
+        raise ContractError('invalid_objective_state')
+    normalized = value.strip().upper()
+    if normalized not in ('RUNNING', 'PAUSED', 'CANCELLED', 'FAILED', 'INTERRUPTED', 'COMPLETE', 'BLOCKED'):
+        raise ContractError('invalid_objective_state')
+    return normalized
+
+
 def _path(root: Path) -> Path:
     if not root.is_absolute():
         raise ContractError("ledger_root_must_be_absolute")
@@ -111,16 +120,22 @@ def _find(data: dict, dispatch_id: str) -> dict:
 def mark_started(root: Path, dispatch_id: str, child_reference: str) -> dict:
     with _ledger_lock(root):
         data = _load(root); item = _find(data, dispatch_id); _check(child_reference, "child_reference")
-        if item["state"] not in ("reserved", "started"):
+        child_hash = hashlib.sha256(child_reference.encode()).hexdigest()
+        if item["state"] == "started":
+            if item.get("child_reference_hash") == child_hash:
+                return {"status": "already_started", "dispatch": item}
+            return {"status": "reconcile_required", "reason": "child_identity_changed", "dispatch": item}
+        if item["state"] != "reserved":
             raise ContractError("dispatch_not_startable")
         item["state"] = "started"
-        item["child_reference_hash"] = hashlib.sha256(child_reference.encode()).hexdigest()
+        item["child_reference_hash"] = child_hash
         _save(root, data)
         return {"status": "started", "dispatch": item}
 
 
 def record_delivery(root: Path, dispatch_id: str, *, candidate_hash: str, packet_hash: str,
-                    delivery: dict, objective_state: str = "RUNNING") -> dict:
+                    delivery: dict, objective_state: str) -> dict:
+    objective_state = _objective_state(objective_state)
     with _ledger_lock(root):
         data = _load(root); item = _find(data, dispatch_id)
         if item["state"] == "stale":
@@ -129,22 +144,30 @@ def record_delivery(root: Path, dispatch_id: str, *, candidate_hash: str, packet
         if candidate_hash != item["candidate_hash"] or packet_hash != item["packet_hash"]:
             item["state"] = "stale"; _save(root, data)
             return {"status": "stale", "reason": "candidate_or_packet_changed", "dispatch": item}
-        if objective_state in ("PAUSED", "CANCELLED", "FAILED"):
+        if objective_state != "RUNNING":
             return {"status": "late_ignored", "reason": "objective_not_running", "dispatch": item}
         if item["state"] == "delivered":
             return {"status": "already_delivered", "reason": "delivery_already_recorded", "dispatch": item}
+        if item["state"] != "started":
+            return {"status": "delivery_before_start", "reason": "dispatch_not_started", "dispatch": item}
         if not isinstance(delivery, dict):
             raise ContractError("delivery_must_be_object")
+        if not isinstance(delivery.get('status'), str) or not delivery['status']:
+            raise ContractError('delivery_status_required')
+        for field in ('checks', 'pending'):
+            if field in delivery and (not isinstance(delivery[field], list) or len(delivery[field]) > 100):
+                raise ContractError('invalid_delivery_' + field)
         item["state"] = "delivered"; item["delivery_hash"] = hashlib.sha256(canonical(delivery)).hexdigest()
-        item["delivery"] = {k: delivery[k] for k in ("status", "evidence", "summary", "candidate_hash") if k in delivery}
+        item["delivery"] = {k: delivery[k] for k in ("status", "evidence", "summary", "candidate_hash", "checks", "pending") if k in delivery}
         _save(root, data)
         return {"status": "delivered", "dispatch": item}
 
 
 def continuation(root: Path, dispatch_id: str, *, objective_state: str = "RUNNING",
                  budget_remaining: bool = True) -> dict:
+    objective_state = _objective_state(objective_state)
     data = _load(root); item = _find(data, dispatch_id)
-    if objective_state in ("PAUSED", "CANCELLED") or not budget_remaining:
+    if objective_state != "RUNNING" or not budget_remaining:
         return {"action": "stop", "reason": "objective_control_or_budget", "dispatch": item}
     if item["state"] in ("stale",):
         return {"action": "reconcile", "reason": "stale_delivery", "dispatch": item}

@@ -31,9 +31,22 @@ class ComplementTests(unittest.TestCase):
             did = first['dispatch']['dispatch_id']
             self.assertEqual(reserve_dispatch(root, objective_id='obj1', project_id='proj1', block_id='block1', attempt='attempt1', profile='sol_high', candidate_hash=h('c'), packet_hash=h('p'), dispatch_key=h('k'))['status'], 'reused')
             mark_started(root, did, 'child1')
-            self.assertEqual(record_delivery(root, did, candidate_hash=h('changed'), packet_hash=h('p'), delivery={})['status'], 'stale')
-            self.assertEqual(record_delivery(root, did, candidate_hash=h('c'), packet_hash=h('p'), delivery={})['status'], 'stale')
+            self.assertEqual(mark_started(root, did, 'child1')['status'], 'already_started')
+            self.assertEqual(mark_started(root, did, 'child2')['status'], 'reconcile_required')
+            self.assertEqual(record_delivery(root, did, candidate_hash=h('changed'), packet_hash=h('p'), delivery={}, objective_state='RUNNING')['status'], 'stale')
+            self.assertEqual(record_delivery(root, did, candidate_hash=h('c'), packet_hash=h('p'), delivery={}, objective_state='RUNNING')['status'], 'stale')
             self.assertEqual(continuation(root, did)['action'], 'reconcile')
+
+    def test_delivery_requires_started_and_normalizes_terminal_states(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); h = lambda x: hashlib.sha256(x.encode()).hexdigest()
+            reserved = reserve_dispatch(root, objective_id='obj1', project_id='proj1', block_id='block1', attempt='attempt1', profile='sol_high', candidate_hash=h('c'), packet_hash=h('p'), dispatch_key=h('k'))
+            did = reserved['dispatch']['dispatch_id']
+            self.assertEqual(record_delivery(root, did, candidate_hash=h('c'), packet_hash=h('p'), delivery={'status':'ok'}, objective_state='running')['status'], 'delivery_before_start')
+            mark_started(root, did, 'child1')
+            self.assertEqual(record_delivery(root, did, candidate_hash=h('c'), packet_hash=h('p'), delivery={'status':'ok'}, objective_state='interrupted')['status'], 'late_ignored')
+            self.assertEqual(record_delivery(root, did, candidate_hash=h('c'), packet_hash=h('p'), delivery={'status':'ok','checks':['C1'],'pending':[]}, objective_state='RUNNING')['status'], 'delivered')
+            self.assertEqual(continuation(root, did, objective_state='COMPLETE')['action'], 'stop')
 
     def test_concurrent_reservation_has_one_winner(self):
         if 'fork' not in multiprocessing.get_all_start_methods():
@@ -55,6 +68,13 @@ class ComplementTests(unittest.TestCase):
             self.assertTrue(boundary['inside_product']); self.assertFalse(boundary['write_allowed_by_helper'])
             with self.assertRaises(ContractError): write_evidence(evidence, '../product/x', b'x')
 
+    def test_qa_prepare_rejects_nested_product_before_mutating_permissions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); product = root / 'product'; product.mkdir(mode=0o755)
+            nested = product / 'evidence'
+            with self.assertRaises(ContractError): prepare_workspace(root / 'state', nested, product)
+            self.assertEqual(product.stat().st_mode & 0o777, 0o755)
+
     def test_component_evidence_and_gate_are_proportional(self):
         p = packet(); p['component_evidence'] = [{'component':'web','repository':'repo','candidate_sha':'a'*40,'status':'independent','checks':['c1'],'depends_on':[]}]
         self.assertTrue(gate(p)['passed'])
@@ -62,6 +82,21 @@ class ComplementTests(unittest.TestCase):
             validate_component_evidence([{'component':'web','repository':'repo','candidate_sha':'bad','status':'independent','checks':[]}])
         with self.assertRaises(ContractError):
             validate_component_evidence([{'component':'web','repository':'','candidate_sha':'a'*40,'status':'independent','checks':[]}])
+
+    def test_component_closeout_blocks_required_blocked_but_allows_unrelated_independent(self):
+        p = packet(); p['required_components'] = ['ios']; p['shared_contracts'] = ['contract_changed']
+        p['component_evidence'] = [
+            {'component':'ios','repository':'repo','candidate_sha':'a'*40,'status':'blocked','checks':['c1'],'depends_on':['api']},
+            {'component':'docs','repository':'repo','candidate_sha':'b'*40,'status':'independent','checks':[],'depends_on':[]},
+        ]
+        self.assertTrue(gate(p)['passed'])
+        self.assertIn('required_component_blocked:ios', gate(p, 'closeout')['issues'])
+        with self.assertRaises(ContractError):
+            validate_component_evidence(p['component_evidence'], ['ios'], ['contract_changed'])
+
+    def test_component_closeout_requires_evidence_when_components_are_declared(self):
+        p = packet(); p['required_components'] = ['ios']
+        self.assertIn('required_component_evidence_missing:ios', gate(p, 'closeout')['issues'])
 
     def test_report_keeps_unknowns_and_limit(self):
         with tempfile.TemporaryDirectory() as tmp:

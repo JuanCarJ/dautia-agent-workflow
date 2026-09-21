@@ -142,8 +142,8 @@ def main(argv: list[str] | None = None) -> int:
     ex = sub.add_parser('export'); ex.add_argument('objective'); ex.add_argument('--legacy-snapshot', type=Path)
     qa = sub.add_parser('qa-prepare'); qa.add_argument('evidence_root', type=Path); qa.add_argument('--product-root', type=Path)
     qw = sub.add_parser('qa-write'); qw.add_argument('evidence_root', type=Path); qw.add_argument('relative_path'); qw.add_argument('input', type=Path)
-    dl = sub.add_parser('delivery'); dl.add_argument('dispatch_id'); dl.add_argument('delivery', type=Path); dl.add_argument('--candidate-hash', required=True); dl.add_argument('--packet-hash', required=True); dl.add_argument('--objective-state', default='RUNNING')
-    dc = sub.add_parser('dispatch-continue'); dc.add_argument('dispatch_id'); dc.add_argument('--objective-state', default='RUNNING'); dc.add_argument('--no-budget', action='store_true')
+    dl = sub.add_parser('delivery'); dl.add_argument('dispatch_id'); dl.add_argument('delivery', type=Path); dl.add_argument('--candidate-hash', required=True); dl.add_argument('--packet-hash', required=True); dl.add_argument('--objective-state', required=True)
+    dc = sub.add_parser('dispatch-continue'); dc.add_argument('dispatch_id'); dc.add_argument('--objective-state', required=True); dc.add_argument('--no-budget', action='store_true')
     rp = sub.add_parser('objective-report'); rp.add_argument('--limit', type=int, default=30)
     sub.add_parser('doctor')
     args = ap.parse_args(argv); root = args.state_root or state_root(); code = 0

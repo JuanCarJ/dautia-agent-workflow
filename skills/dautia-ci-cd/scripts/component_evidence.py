@@ -24,7 +24,12 @@ def validate_component_evidence(evidence: Any, required_components: list[str] | 
         depends = item.get('depends_on', [])
         if not isinstance(depends, list) or not all(isinstance(x, str) and x for x in depends):
             raise ContractError('invalid_component_dependencies')
-        if 'contract_changed' in shared and not depends: raise ContractError('shared_contract_dependency_missing')
+        if 'contract_changed' in shared and item['status'] == 'dependent' and not depends:
+            raise ContractError('shared_contract_dependency_missing:' + name)
+        if name in required and item['status'] == 'blocked':
+            raise ContractError('required_component_blocked:' + name)
+        if name in required and not item.get('checks'):
+            raise ContractError('required_component_checks_missing:' + name)
         normalized.append({'component': name, 'repository': item['repository'], 'candidate_sha': item['candidate_sha'].lower(),
                            'status': item['status'], 'checks': item.get('checks', []), 'depends_on': depends})
     missing = sorted(required - seen)

@@ -55,6 +55,13 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(gate(p)['passed']); self.assertTrue(gate(p,'closeout')['passed'])
         self.assertFalse(gate(p)['authorizes_action'])
 
+    def test_incomplete_read_reports_warning_but_incomplete_write_blocks(self):
+        read = packet('read', 'systems_analyst', 'AUDIT'); read['context_complete'] = False
+        result = gate(read)
+        self.assertTrue(result['passed']); self.assertIn('context_incomplete', result['warnings'])
+        write = packet('write_product', 'implementer', 'IMPLEMENTATION'); write['context_complete'] = False
+        self.assertIn('context_incomplete', gate(write)['issues'])
+
     def test_contract_test_conflict_before_write(self):
         p=packet('write_product','implementer','IMPLEMENTATION'); p['test_expectations'][0]['expected']['camera_changed']=True
         self.assertIn('contract_test_conflict:T1',gate(p)['issues'])
