@@ -11,7 +11,7 @@ import tomllib
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'skills/dautia-project-cycle/scripts'))
 from skill_catalog import frontmatter
-from workflow_core import ContractError, policy
+from workflow_core import ContractError, role_profiles
 
 
 def render(repo: Path, profile: dict) -> dict[str,bytes]:
@@ -28,16 +28,21 @@ def render(repo: Path, profile: dict) -> dict[str,bytes]:
         if re.search(r'\b(?:Astra|Sol)\b',body):
             raise ContractError('model_specific_role_body:'+role)
         seen.add(role)
-        if profile['codex_agents'].get(role)!=['gpt-5.6-sol','high']:
-            raise ContractError('default_role_profile_must_be_sol_high:'+role)
-        profiles=['sol_high']
-        if role in rules['analysis_roles'] and meta['mutability']=='read_only':
-            profiles+=['astra_low','astra_medium','astra_high']
-        for key in profiles:
-            selected=rules['profiles'][key];name=role if key=='sol_high' else role+'__'+key
+        eligible = role_profiles(role, rules)
+        configured = profile['codex_agents'].get(role)
+        defaults = [key for key in eligible if [rules['profiles'][key]['model'], rules['profiles'][key]['effort']] == configured]
+        if len(defaults) != 1:
+            raise ContractError('invalid_role_default_profile:' + role)
+        default = defaults[0]
+        if rules['profiles'][default]['family'] == 'astra' and meta['mutability'] != 'read_only':
+            raise ContractError('astra_writer_default_refused:' + role)
+        profiles = [key for key in eligible if rules['profiles'][key]['family'] == 'sol' or meta['mutability'] == 'read_only']
+        entries = [(role, default)] + [(role+'__'+key, key) for key in profiles]
+        for name, key in entries:
+            selected=rules['profiles'][key]
             # Read-only is the conservative sandbox. Artifact-writing QA needs a
             # separately verified artifact workspace/permission profile on the host.
-            values={'name':name,'description':meta['description']+(' Analysis-only; high requires explicit request.' if key!='sol_high' else ''),
+            values={'name':name,'description':meta['description']+(' Analysis-only.' if selected['family']=='astra' else '')+(' Requires explicit profile request.' if selected.get('explicit_only') else ''),
                     'model':selected['model'],'model_reasoning_effort':selected['effort'],
                     'sandbox_mode':'read-only' if meta['mutability']=='read_only' else 'workspace-write',
                     'developer_instructions':body+'\n'+boundary}

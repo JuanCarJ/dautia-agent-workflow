@@ -71,6 +71,8 @@ def payloads(repo: Path, home: Path, profile_name: str, scope: str='workflow', c
             mode=0o700 if source.stat().st_mode&0o111 else 0o600
             result[str(skill_root/name/source.relative_to(directory))]=(source.read_bytes(),mode)
     adapters=render(repo,profile)
+    definitions={name.split('/',1)[1]:sha(data) for name,data in adapters.items() if name.startswith('codex/')}
+    result[str(codex/'agents/dautia-r3-definitions.json')]=(canonical({'schema_version':1,'definitions':definitions})+b'\n',0o600)
     for name,data in adapters.items():
         kind,filename=name.split('/',1)
         if kind=='codex':result[str(codex/'agents'/filename)]=(data,0o600)

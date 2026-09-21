@@ -5,7 +5,7 @@ implements setup, doctor, synthetic probe and evaluate over packet schema 3.
 The r3 plan governs routing; the earlier prototype schema 1 is not silently adopted.
 
 Checkpoints: brief (coverage), impact (known consumers), continuity (decision delta),
-route (analytical profile), context (optional recoverable evidence), progress
+route (prepared implementation medium/high or analytical profile), context (optional recoverable evidence), progress
 (remaining work/reframe), closeout (claim vs evidence), action (scope/procedure).
 Do not call all checkpoints for every message. Mechanical identities, permissions,
 exit codes and failed tests need deterministic checks, not another model call.
@@ -37,7 +37,7 @@ request/response sizes, question count, timeout, per-day and per-objective quota
 cache TTL and per-function confidence thresholds. Initial thresholds are NOT
 calibrated. Record policy/model/question versions during evaluation.
 
-Modes: off; shadow (record recommendations, keep default); selective (apply only
+Modes: off; shadow (record recommendations, keep the baseline/principal choice); selective (apply only
 explicitly enabled route/context features after a successful pilot). `apply_features`
 is empty initially. Even selective returns a prepared dispatch target, not an agent
 that was spawned. It never changes authorization or certifies a result.
@@ -61,3 +61,7 @@ negative evidence. Batching is explicit when a request exceeds its configured ca
 Metadata telemetry records recommendation vs selected profile and typed question
 results separately; model observed from a worker remains unknown until actual
 runtime evidence. No rate/cost/quality claim comes from client latency alone.
+
+Routing r3.2 uses `model-routing.md` and the `dispatch-plan` consumer. The default
+implementer is medium; defining a profile or obtaining a recommendation is not
+proof that the native client executed it. No live activation is implied.

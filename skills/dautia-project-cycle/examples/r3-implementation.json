@@ -9,7 +9,9 @@
     "role": "implementer",
     "analysis": false,
     "material": true,
-    "target": "local"
+    "target": "local",
+    "decisions_resolved": true,
+    "execution_difficulty": "routine"
   },
   "authority": {
     "source_kind": "user",
@@ -72,15 +74,13 @@
   },
   "runtime": {
     "available_profiles": [
-      "sol_high",
-      "astra_low",
-      "astra_medium"
+      "sol_medium",
+      "sol_high"
     ],
     "harness": "codex",
     "available_targets": [
-      "systems_analyst",
-      "systems_analyst__astra_low",
-      "systems_analyst__astra_medium"
+      "implementer__sol_medium",
+      "implementer__sol_high"
     ]
   },
   "data_sharing": {

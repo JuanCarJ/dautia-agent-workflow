@@ -4,8 +4,11 @@ Workflow portable para Codex y Cursor, separado de los productos. Esta revisión
 un candidato de piloto: controles ejecutables y pruebas locales no equivalen a
 validación real de modelos, Desktop, dispositivos o proveedores.
 
-Sol 5.6 high es el principal/ejecutor predeterminado. Jev puede asesorar análisis
-Sol/Astra sin autorizar acciones; las skills y los criterios no dependen de la marca.
+Sol 5.6 high permanece en el principal. El implementador definido usa medium;
+la ejecución técnicamente exigente usa high. Jev puede evaluar medium/high y
+análisis Sol/Astra sin autorizar acciones. Las skills conservan sus criterios.
+[Routing r3.2](skills/dautia-project-cycle/references/model-routing.md) describe
+selección, destinos generados y verificación del despacho; no activa Jev.
 No se incorpora un fork de FirstMate ni un supervisor adicional.
 
 ## Fuentes y generación

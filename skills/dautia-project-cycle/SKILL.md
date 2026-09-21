@@ -56,6 +56,17 @@ Jev setup/usage lives in `references/jev-support.md`. All eight checkpoints are
 optional and narrow; do not call them for every command. A negative observation,
 failed test or missing permission is relevant even when Jev is unavailable.
 
+For material delegation, prepare the actual worker packet and call
+`workflow_cli.py dispatch-plan PACKET --agents-dir CODEX_HOME/agents --cwd WORKSPACE`.
+Supply the host's observed available profiles/targets. For product/test writers,
+record whether the decisions are resolved and whether execution is routine,
+demanding or unknown; unresolved decisions return to analysis before writing.
+Use the returned exact `agent_type` in the native spawn and pass the same context.
+Do not substitute the canonical role or silently inherit the parent's effort.
+A prepared JSON request is not a spawned child: record its actual start/report and
+receive its delivery. The CLI does not intercept the native tool. Jev off/shadow
+still allows an evidence-backed principal choice among ordinary eligible profiles.
+
 Delegate only a useful bounded block. Retain one writer per workspace and one
 operator per simulator/browser/side-effectful resource. `workflow_cli.py lease`
 provides a cooperative same-host lease; it is not a distributed or security lock.

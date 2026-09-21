@@ -191,14 +191,14 @@ class CoreTests(unittest.TestCase):
 
 
 class RoutingTests(unittest.TestCase):
-    def test_default_all_roles_high(self):
+    def test_role_defaults_preserve_root_high_and_implementer_medium(self):
         from workflow_core import READ_ROLES,WRITE_ROLES
         for role in READ_ROLES|WRITE_ROLES:
             with self.subTest(role=role):
-                self.assertEqual(profile_selection(role,'read',analysis=True)['selected'],'sol_high')
+                self.assertEqual(profile_selection(role,'read',analysis=True)['selected'],'sol_medium' if role=='implementer' else 'sol_high')
 
     def test_no_astra_writer(self):
-        self.assertEqual(profile_selection('implementer','write_product',analysis=False,recommendation='astra_medium')['selected'],'sol_high')
+        self.assertEqual(profile_selection('implementer','write_product',analysis=False,decisions_resolved=True,execution_difficulty='routine',recommendation='astra_medium')['selected'],'sol_medium')
 
     def test_analytical_advisory_allowed(self):
         self.assertEqual(profile_selection('ux_auditor','read',analysis=True,recommendation='astra_low',available=['sol_high','astra_low'])['selected'],'astra_low')
@@ -234,9 +234,9 @@ class JevTests(unittest.TestCase):
     def test_network_explicit(self):
         transport=Mock();jev.evaluate('route',packet(),self.cfg,self.root,transport=transport);transport.assert_not_called()
 
-    def test_writer_no_route_call(self):
+    def test_unprepared_writer_requires_readiness_before_route_call(self):
         transport=Mock();r=jev.evaluate('route',packet('write_product','implementer','IMPLEMENTATION'),self.cfg,self.root,allow_network=True,transport=transport)
-        transport.assert_not_called();self.assertEqual(r['selection']['selected'],'sol_high')
+        transport.assert_not_called();self.assertEqual(r['selection']['reason'],'implementation_readiness_required');self.assertIsNone(r['selection']['selected'])
 
     def test_complex_analysis_shadow_then_selective(self):
         labels={'information':'sufficient','decisions':'coupled','depth':'deep','contradictions':'multiple'}
@@ -380,12 +380,13 @@ class CatalogAndWorkspaceTests(unittest.TestCase):
         raw=b'1 .M N... 100644 100644 100644 a b file with spaces\0? newline\nfile\0'
         items=parse_status(raw);self.assertEqual(items[0]['path'],'file with spaces');self.assertEqual(items[1]['path'],'newline\nfile')
 
+    @patch.dict(os.environ, {'GIT_CONFIG_GLOBAL': os.devnull, 'GIT_CONFIG_SYSTEM': os.devnull, 'GIT_CONFIG_NOSYSTEM': '1'})
     def test_readonly_git_snapshot_preserves_foreign(self):
         with tempfile.TemporaryDirectory() as d:
             repo=Path(d);subprocess.run(['git','init','-q',d],check=True)
             f=repo/'foreign.txt';f.write_text('do not lose')
             before=snapshot(repo,'repo1','w1');after=snapshot(repo,'repo1','w1')
-            r=reconcile(before,after,[]);self.assertTrue(r['reconciled']);self.assertEqual(f.read_text(),'do not lose')
+            r=reconcile(before,after,[]);self.assertTrue(r['reconciled'], {'before': before, 'after': after, 'result': r});self.assertEqual(f.read_text(),'do not lose')
             (repo/'own.txt').write_text('work')
             r=reconcile(before,snapshot(repo,'repo1','w1'),['own.txt']);self.assertEqual(r['own_residual_paths'],['own.txt']);self.assertFalse(r['disposable'])
 

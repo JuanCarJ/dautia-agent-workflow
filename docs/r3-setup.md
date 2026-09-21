@@ -37,7 +37,8 @@ python3 scripts/install.py --profile codex-macos --scope workflow --check
 `--configure-root` es opt-in: solo actualiza model y model_reasoning_effort del
 nivel raíz de config.toml. No modifica credenciales, MCP, roles personalizados,
 sesiones activas ni límites administrados. Los defaults de los trabajadores
-canónicos sí se instalan como Sol high; no heredan Astra accidentalmente.
+canónicos se instalan según el perfil del host: principal high, implementer medium
+y variantes explícitas medium/high para el despacho; no heredan Astra accidentalmente.
 Los archivos de versiones anteriores que ya no administra esta revisión no se
 borran automáticamente. Reconciliarlos si colisionan con el catálogo activo.
 
@@ -110,7 +111,8 @@ escritor autorizado y QA valida después. No se afirma equivalencia App/CLI/Curs
 
 ## Prueba del host antes de adopción
 
-Verificar versión/descubrimiento de roles, Sol high aplicado, retorno de un hijo,
+Verificar versión/descubrimiento de roles, perfil realmente aplicado (principal high,
+implementer medium o high según el encargo), retorno de un hijo,
 consulta analítica Astra sin escritura, rechazo de contradicción, pausa/reanudación,
 artefactos QA y preservación de cambios ajenos. La medición de modelos reportados
 queda unknown si el runtime no la expone. Solo después activar el piloto de datos
