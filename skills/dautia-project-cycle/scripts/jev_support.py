@@ -30,6 +30,7 @@ import time
 
 from workflow_core import validate_packet, gate, fingerprint, profile_selection, ContractError, policy, routing_arguments
 from workflow_store import emit, state_root
+from evidence_contract import validate_evidence, validate_project_context
 
 STAGES = ('brief', 'impact', 'continuity', 'route', 'context', 'progress', 'closeout', 'action')
 MODES = ('DISCOVERY', 'AUDIT', 'IMPLEMENTATION', 'RELEASE')
@@ -49,20 +50,50 @@ class SupportError(ValueError):
     """Safe public reason code. Never put raw payloads or credentials in it."""
 
 
+def evidence_readiness(packet: dict) -> list[str]:
+    """Validate supplied evidence without requiring scratch projects to be complete."""
+    warnings: list[str] = []
+    evidence = packet.get('evidence')
+    if evidence is None:
+        warnings.append('evidence_index_missing')
+    elif not isinstance(evidence, list):
+        raise SupportError('invalid_evidence_contract')
+    else:
+        for record in evidence:
+            result = validate_evidence(record)
+            if not result['valid']:
+                raise SupportError('invalid_evidence_contract')
+            normalized = result['record']
+            if normalized['objective_id'] != packet['objective_id'] or normalized['project_id'] != packet['project_id']:
+                raise SupportError('evidence_project_or_objective_mismatch')
+            warnings.extend(result['warnings'])
+    context = packet.get('project_context')
+    if context is None:
+        warnings.append('project_context_missing')
+    else:
+        result = validate_project_context(context)
+        if not result['valid']:
+            raise SupportError('invalid_project_context')
+        if result['context']['project_id'] != packet['project_id']:
+            raise SupportError('project_context_project_mismatch')
+        warnings.extend(result['warnings'])
+    return sorted(set(warnings))
+
+
 # Stage projections keep optional decision support contextual. They are deliberately
 # smaller than a packet and never carry transcripts, prompts or private credentials.
 STAGE_FIELDS = {
-    'brief': ('objective_id', 'project_id', 'outcome', 'work', 'requirements'),
-    'impact': ('objective_id', 'project_id', 'outcome', 'work', 'requirements', 'impacts', 'sources'),
+    'brief': ('objective_id', 'project_id', 'outcome', 'work', 'requirements', 'project_context'),
+    'impact': ('objective_id', 'project_id', 'outcome', 'work', 'requirements', 'impacts', 'sources', 'evidence', 'project_context'),
     'continuity': ('objective_id', 'project_id', 'outcome', 'new_message', 'candidate', 'spec_changes', 'decisions', 'authority', 'control'),
     # Routing needs the evidence frontier to distinguish routine execution from
     # genuinely unresolved analysis. These records remain field/depth bounded
     # by _project_record and _sanitize_value.
-    'route': ('objective_id', 'project_id', 'outcome', 'analysis_brief', 'work', 'requirements', 'sources', 'impacts', 'pending', 'findings', 'runtime', 'authority', 'control'),
-    'context': ('objective_id', 'project_id', 'outcome', 'work', 'requirements', 'optional_context', 'sources', 'skills'),
-    'progress': ('objective_id', 'project_id', 'outcome', 'work', 'candidate', 'pending', 'delegations', 'findings', 'control'),
-    'closeout': ('objective_id', 'project_id', 'outcome', 'completion_claim', 'work', 'candidate', 'requirements', 'test_expectations', 'checks', 'review', 'delegations', 'pending'),
-    'action': ('objective_id', 'project_id', 'outcome', 'work', 'authority', 'proposed_action', 'external', 'release', 'recovery'),
+    'route': ('objective_id', 'project_id', 'outcome', 'analysis_brief', 'work', 'requirements', 'sources', 'evidence', 'impacts', 'pending', 'findings', 'project_context', 'runtime', 'authority', 'control'),
+    'context': ('objective_id', 'project_id', 'outcome', 'work', 'requirements', 'optional_context', 'sources', 'evidence', 'skills', 'project_context'),
+    'progress': ('objective_id', 'project_id', 'outcome', 'work', 'candidate', 'evidence', 'pending', 'delegations', 'findings', 'project_context', 'control'),
+    'closeout': ('objective_id', 'project_id', 'outcome', 'completion_claim', 'work', 'candidate', 'requirements', 'test_expectations', 'checks', 'evidence', 'review', 'delegations', 'pending', 'project_context'),
+    'action': ('objective_id', 'project_id', 'outcome', 'work', 'authority', 'proposed_action', 'external', 'release', 'recovery', 'evidence', 'project_context'),
 }
 STAGE_REQUIRED = {
     'brief': ('objective_id', 'project_id', 'work'),
@@ -88,6 +119,7 @@ RECORD_FIELDS = {
     'findings': ('id', 'kind', 'summary', 'resolved', 'evidence'),
     'test_expectations': ('id', 'requirement_id', 'expected'),
     'checks': ('id', 'requirement_id', 'status', 'candidate_hash', 'acceptance_hash', 'evidence_kind', 'evidence', 'provider_live', 'physical_device', 'fail_before', 'prior_failed', 'failure_resolution'),
+    'evidence': ('id', 'evidence_id', 'source_kind', 'source_ref', 'observed_at', 'candidate_sha', 'acceptance_hash', 'observation', 'status', 'strength', 'supports', 'contradicts'),
 }
 SENSITIVE_KEY = re.compile(r'(?i)(transcript|prompt|message|chat|private|secret|password|token|credential|cookie|raw|payload)')
 OBJECT_FIELDS = {
@@ -100,6 +132,7 @@ OBJECT_FIELDS = {
     'external': ('required', 'outcome', 'target'),
     'release': ('authorized_candidate_hash', 'target'),
     'proposed_action': ('kind', 'target', 'procedure', 'scope'),
+'project_context': ('project_id', 'documentation_status', 'active_workstream', 'workstreams', 'repositories', 'environments', 'components', 'providers', 'risk_classes', 'canonical_sources', 'unknowns', 'notes'),
 }
 
 
@@ -358,6 +391,7 @@ def choice(instructions: Any, criteria: dict) -> dict:
 
 def build_request(stage: str, p: dict, cfg: dict) -> dict:
     validate_packet(p)
+    evidence_warnings = evidence_readiness(p)
     questions: dict = {}
     if stage not in STAGES:
         raise SupportError('unknown_stage')
@@ -395,6 +429,8 @@ def build_request(stage: str, p: dict, cfg: dict) -> dict:
         raise SupportError('question_budget_exceeded_split_explicitly')
     # Only the stage-specific, explicitly authorized envelope leaves the host.
     state, missing = project_stage_input(stage, p)
+    if evidence_warnings:
+        state['evidence_warnings'] = evidence_warnings
     if stage == 'route':
         state['routing_kind'] = selection.get('routing_kind')
         state['eligible_profiles'] = selection.get('candidates', [])
