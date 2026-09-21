@@ -8,6 +8,7 @@ A returned model is a runtime report, not independent provider attestation.
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 import tomllib
 from typing import Callable
@@ -47,6 +48,19 @@ def prepare_dispatch(packet: dict, decision: dict, agents_dir: Path) -> dict:
     if not path.is_file() or path.stat().st_size > 256_000:
         raise ContractError('native_target_definition_missing')
     raw = path.read_bytes()
+    manifest_path = agents_dir / 'dautia-r3-definitions.json'
+    if not manifest_path.is_file() or manifest_path.stat().st_size > 256_000:
+        raise ContractError('native_target_manifest_missing')
+    try:
+        manifest = json.loads(manifest_path.read_bytes())
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise ContractError('invalid_native_target_manifest') from exc
+    definitions = manifest.get('definitions') if isinstance(manifest, dict) else None
+    expected_hash = definitions.get(target + '.toml') if isinstance(definitions, dict) else None
+    if (not isinstance(manifest, dict) or manifest.get('schema_version') != 1
+            or not isinstance(expected_hash, str)
+            or expected_hash != hashlib.sha256(raw).hexdigest()):
+        raise ContractError('native_target_definition_drift')
     try:
         config = tomllib.loads(raw.decode('utf-8'))
     except (UnicodeError, tomllib.TOMLDecodeError) as exc:
@@ -85,7 +99,11 @@ def dispatch_prepared(packet: dict, decision: dict, prepared: dict, agents_dir: 
              'context_hash': current['context_hash'], 'policy_hash': current['policy_hash'],
              'observation_kind': 'host_adapter', 'authorizes_action': False}
     if events_root is not None:
-        emit(events_root, dict(event, event_type='dispatch.requested', status='requested'), 'dispatch')
+        try:
+            emit(events_root, dict(event, event_type='dispatch.requested', status='requested'), 'dispatch')
+        except Exception:
+            # Telemetry is optional; it must not turn a prepared dispatch into a retry gate.
+            pass
     # Context goes to the worker, never into the statistical event stream.
     message = 'Execute only this delegated packet within its authority; return evidence to the principal.\n' + canonical(packet).decode()
     try:
@@ -109,6 +127,10 @@ def dispatch_prepared(packet: dict, decision: dict, prepared: dict, agents_dir: 
     if events_root is not None:
         # Only opaque correlation escapes into telemetry; no prompts or native IDs.
         run = 'child-' + hashlib.sha256(child.encode()).hexdigest()[:24]
-        emit(events_root, dict(event, event_type='agent.started', status=result['status'], run_id=run,
-                               model_reported=model, effort_reported=effort), 'dispatch')
+        try:
+            emit(events_root, dict(event, event_type='agent.started', status=result['status'], run_id=run,
+                                   model_reported=model, effort_reported=effort), 'dispatch')
+        except Exception:
+            return dict(result, status='dispatch_outcome_unknown', reason='post_spawn_telemetry_unknown',
+                        delivery_received=False)
     return result

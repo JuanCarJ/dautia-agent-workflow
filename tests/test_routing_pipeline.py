@@ -31,6 +31,9 @@ class RoutingPipelineTests(unittest.TestCase):
         for path, raw in self.generated.items():
             if path.startswith('codex/'):
                 (self.agents/Path(path).name).write_bytes(raw)
+        definitions={Path(path).name:__import__('hashlib').sha256(raw).hexdigest()
+                     for path,raw in self.generated.items() if path.startswith('codex/')}
+        (self.agents/'dautia-r3-definitions.json').write_text(json.dumps({'schema_version':1,'definitions':definitions}))
         self.cfg = jev.defaults(); self.cfg.update(mode='selective', apply_features=['route'], cache_ttl_seconds=0)
         self.env = patch.dict(os.environ, {'TYPESAFE_API_KEY':'synthetic-test-only'})
         self.env.start(); self.addCleanup(self.env.stop)
@@ -133,6 +136,12 @@ class RoutingPipelineTests(unittest.TestCase):
         self.assertIsNone(r['dispatch_target'])
         with self.assertRaises(ContractError):prepare_dispatch(p,r,self.agents)
 
+    def test_definition_mutation_is_rejected_before_spawn(self):
+        p=self.work();r=self.evaluate(p);path=self.agents/'implementer__sol_medium.toml'
+        path.write_text(path.read_text().replace('Execute', 'Mutated', 1))
+        with self.assertRaisesRegex(ContractError,'definition_drift'):
+            prepare_dispatch(p,r,self.agents)
+
     def test_all_explicit_solvable_profiles_have_generated_definitions(self):
         for key in ('sol_medium','sol_high','sol_xhigh'):
             with self.subTest(key=key):
@@ -205,6 +214,15 @@ class RoutingPipelineTests(unittest.TestCase):
         p=self.work();r=self.evaluate(p);plan=prepare_dispatch(p,r,self.agents);spawn=Mock(side_effect=TimeoutError())
         result=dispatch_prepared(p,r,plan,self.agents,spawn)
         self.assertEqual(result['status'],'dispatch_outcome_unknown');self.assertIsNone(result['dispatch_performed']);spawn.assert_called_once()
+
+    def test_post_spawn_telemetry_failure_is_reconciliation_state(self):
+        p=self.work();r=self.evaluate(p);plan=prepare_dispatch(p,r,self.agents)
+        spawn=Mock(return_value={'agent_id':'child-telemetry','model':'gpt-5.6-sol','model_reasoning_effort':'medium'})
+        with patch('workflow_dispatch.emit', side_effect=[None, RuntimeError('telemetry sink')]):
+            result=dispatch_prepared(p,r,plan,self.agents,spawn,events_root=self.root/'events')
+        self.assertEqual(result['status'],'dispatch_outcome_unknown')
+        self.assertTrue(result['dispatch_performed']);self.assertEqual(result['reason'],'post_spawn_telemetry_unknown')
+        spawn.assert_called_once()
 
     def test_cli_dispatch_plan_off_produces_same_profile_without_spawn(self):
         p=self.work();src=self.root/'packet.json';src.write_text(json.dumps(p));cfg=self.root/'config';state=self.root/'state'
