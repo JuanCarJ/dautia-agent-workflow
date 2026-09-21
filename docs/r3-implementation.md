@@ -52,7 +52,7 @@ La auditoría Git local aún no llegó: su ingesta está disponible, su recupera
 puntual no se ha decidido ni ejecutado. También faltan revisión independiente del
 candidato, integración del PR, piloto App/CLI y permisos QA, medición real Sol/Astra,
 piloto nativo, calibración de perfiles e instalación en el Mac/WSL.
-El catálogo de 52 escenarios es una aceptación de plan, no 52 agentes ejecutados.
+El catálogo histórico de 52 escenarios conserva el plan original y está marcado como superseded; no son 52 agentes ejecutados ni criterios vigentes de este rollback.
 `conformance/r3/implementation-status.json` separa esas fronteras por cambio.
 
 ## Verificación local del candidato
