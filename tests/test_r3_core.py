@@ -62,6 +62,13 @@ class CoreTests(unittest.TestCase):
         write = packet('write_product', 'implementer', 'IMPLEMENTATION'); write['context_complete'] = False
         self.assertIn('context_incomplete', gate(write)['issues'])
 
+    def test_evidence_contract_is_checked_by_gate_but_scratch_warns(self):
+        p = packet(); p['project_context'] = {'project_id':'proj1','documentation_status':'scratch'}
+        result = gate(p)
+        self.assertTrue(result['passed']); self.assertIn('context_incomplete', result['warnings'])
+        p['evidence'] = [{'id':'bad','status':'observed'}]
+        self.assertTrue(any(x.startswith('invalid_evidence:') for x in gate(p)['issues']))
+
     def test_contract_test_conflict_before_write(self):
         p=packet('write_product','implementer','IMPLEMENTATION'); p['test_expectations'][0]['expected']['camera_changed']=True
         self.assertIn('contract_test_conflict:T1',gate(p)['issues'])

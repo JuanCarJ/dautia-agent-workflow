@@ -14,6 +14,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from evidence_contract import validate_evidence, validate_project_context
+
 IDENTIFIER = re.compile(r"^[A-Za-z0-9_.:-]{1,120}$")
 OPERATIONS = {"read", "capture_docs", "write_artifact", "write_product", "write_tests", "git_write", "external_mutation"}
 MODES = {"DISCOVERY", "AUDIT", "IMPLEMENTATION", "RELEASE"}
@@ -215,9 +217,9 @@ def validate_packet(packet: Any) -> dict:
     for flag in ("material", "analysis", "bugfix", "security_opt_in", "prior_effect_unknown", "product_change", "external_required", "target_verified", "host_key_verified", "decisions_resolved"):
         if flag in work and type(work[flag]) is not bool:
             raise ContractError("invalid_boolean_" + flag)
-    for field in ("requirements", "test_expectations", "impacts", "sources", "skills", "checks", "pending", "delegations", "spec_changes", "findings", "workspaces"):
+    for field in ("requirements", "test_expectations", "impacts", "sources", "skills", "checks", "evidence", "pending", "delegations", "spec_changes", "findings", "workspaces"):
         records(packet, field)
-    for field in ("authority", "control", "review", "candidate", "diagnostic", "external", "release", "runtime", "data_sharing"):
+    for field in ("authority", "control", "review", "candidate", "diagnostic", "external", "release", "runtime", "data_sharing", "project_context"):
         if field in packet and not isinstance(packet[field], dict):
             raise ContractError("invalid_object_" + field)
     if "required_capabilities" in work and (not isinstance(work["required_capabilities"], list) or any(not nonempty(x) for x in work["required_capabilities"])):
@@ -298,6 +300,19 @@ def gate(packet: dict, stage: str = "preflight") -> dict:
     warns: list[str] = []
     component_evidence = packet.get("component_evidence")
     required_components = packet.get("required_components", [])
+    if "evidence" in packet:
+        for record in packet.get("evidence", []):
+            checked = validate_evidence(record)
+            if not checked["valid"]:
+                issues.extend("invalid_evidence:" + x for x in checked["errors"])
+            else:
+                warns.extend(checked["warnings"])
+    if "project_context" in packet:
+        context = validate_project_context(packet["project_context"])
+        if not context["valid"]:
+            issues.extend("invalid_project_context:" + x for x in context["errors"])
+        else:
+            warns.extend(context["warnings"])
     if stage in ("closeout", "release") and required_components and component_evidence is None:
         issues.extend("required_component_evidence_missing:" + str(x) for x in required_components)
     if component_evidence is not None:

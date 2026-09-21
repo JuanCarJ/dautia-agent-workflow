@@ -41,6 +41,17 @@ report its precise boundary rather than bypassing it to make the check green.
 The checks compare supplied facts and refresh declared source files; they cannot
 prove semantic understanding, authentic human consent or provider truth.
 
+Use `references/evidence-contract.md` for the bounded evidence index and project
+context manifest. A mature project may provide repository, environment, provider,
+acceptance and observed-check records; a scratch project may declare only its
+identity, objective and explicit `unknown`/`in_progress` gaps. Missing scratch
+documentation is an abstention signal, never a reason to invent a fact or block
+unrelated discovery. Feed evidence references and hashes to Jev, not raw
+transcripts or credentials.
+For Jev replays, keep independently reviewed `gold_profile` labels separate from
+model output and summarize them with `scripts/evidence_metrics.py`; do not lower
+thresholds or enable selective routing from an unlabeled or synthetic corpus.
+
 `bind PACKET --session SESSION --generation GENERATION --cwd WORKSPACE` preserves
 the packet for opt-in root hooks. Rebind at meaningful state changes; preserve
 pause and restart a generation only for a genuinely resumed/new run. Do not use

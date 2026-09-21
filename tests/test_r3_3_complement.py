@@ -136,5 +136,18 @@ class ComplementTests(unittest.TestCase):
         request = jev.build_request('route', p, jev.defaults())
         self.assertNotIn('summary_private_prompt', json.dumps(request))
 
+    def test_route_projection_includes_evidence_and_scratch_context(self):
+        import jev_support as jev
+        p = packet(); p['analysis_brief'] = 'Compare two bounded architecture options.'
+        p['project_context'] = {'project_id':'proj1','documentation_status':'scratch',
+                                'components':[{'name':'web'}], 'notes':'release target unknown'}
+        p['evidence'] = [{'id':'obs-1','evidence_id':'obs-1','objective_id':'obj1','project_id':'proj1',
+                          'stage':'audit','source_kind':'test','source_ref':'run-1','observed_at':'2026-09-21T15:00:00Z',
+                          'status':'observed','strength':'E2','observation':'Two options compile.'}]
+        request = jev.build_request('route', p, jev.defaults())
+        self.assertIn('evidence', request['state'])
+        self.assertIn('project_context', request['state'])
+        self.assertEqual(request['state']['project_context']['documentation_status'], 'scratch')
+
 
 if __name__ == '__main__': unittest.main()

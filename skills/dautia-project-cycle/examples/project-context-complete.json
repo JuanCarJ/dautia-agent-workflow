@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "project_id": "sidequest",
+  "documentation_status": "complete",
+  "repositories": [
+    {"name": "ios", "path": "/Users/juancarj/DautIA/projects/SideQuest", "integration_branch": "dev"},
+    {"name": "admin", "path": "/Users/juancarj/DautIA/projects/SideQuestAdmin", "integration_branch": "main"}
+  ],
+  "components": [
+    {"name": "ios", "risk": "maps"},
+    {"name": "admin", "risk": "auth"},
+    {"name": "database", "risk": "data_contract"}
+  ],
+  "environments": [
+    {"name": "staging", "provider": "supabase"},
+    {"name": "testflight", "provider": "apple"}
+  ],
+  "providers": [
+    {"name": "supabase", "scope": "staging"},
+    {"name": "apple", "scope": "testflight"},
+    {"name": "vercel", "scope": "admin"}
+  ],
+  "canonical_sources": {
+    "product_spec": "docs/specs/",
+    "acceptance": "docs/acceptance/",
+    "release": "docs/releases/"
+  },
+  "notes": "Las reglas locales de cada repositorio prevalecen sobre este índice."
+}
