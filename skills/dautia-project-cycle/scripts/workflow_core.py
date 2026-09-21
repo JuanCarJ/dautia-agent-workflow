@@ -321,9 +321,13 @@ def dispatch_receipt_issues(packet: dict, stage: str) -> list[str]:
         issues.append("dispatch_child_reference_required")
     if not refs(receipt.get("evidence")):
         issues.append("dispatch_terminal_evidence_required")
+    target_role, target_profile = target.rsplit("__", 1) if "__" in target else ("", "")
+    if target_role != packet.get("work", {}).get("role"):
+        issues.append("dispatch_target_role_mismatch")
     expected_profile = runtime.get("required_profile")
-    if not nonempty(expected_profile) and "__" in target:
-        expected_profile = target.rsplit("__", 1)[1]
+    if expected_profile != target_profile:
+        issues.append("dispatch_required_profile_mismatch")
+    expected_profile = target_profile
     if expected_profile not in policy().get("profiles", {}):
         issues.append("dispatch_profile_definition_missing")
         return issues
@@ -331,6 +335,9 @@ def dispatch_receipt_issues(packet: dict, stage: str) -> list[str]:
     if (expected.get("family") == "astra"
             and expected.get("effort") not in ("low", "medium")):
         issues.append("dispatch_astra_effort_above_ceiling")
+    if (expected.get("family") == "astra"
+            and target_role not in policy().get("analysis_roles", [])):
+        issues.append("dispatch_astra_role_not_analytic")
     if receipt.get("model_observed") != expected.get("model"):
         issues.append("dispatch_reported_model_mismatch")
     if receipt.get("effort_observed") != expected.get("effort"):
@@ -587,6 +594,9 @@ def gate(packet: dict, stage: str = "preflight") -> dict:
                         if (expected_profile.get("family") == "astra"
                                 and expected_profile.get("effort") not in ("low", "medium")):
                             issues.append("delegation_astra_effort_above_ceiling:" + child["id"])
+                        if (expected_profile.get("family") == "astra"
+                                and str(required_target).rsplit("__", 1)[0] not in policy().get("analysis_roles", [])):
+                            issues.append("delegation_astra_role_not_analytic:" + child["id"])
                         if child.get("model_observed") != expected_profile.get("model"):
                             issues.append("delegation_model_mismatch:" + child["id"])
                         if child.get("effort_observed") != expected_profile.get("effort"):

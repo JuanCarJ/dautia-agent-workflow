@@ -273,6 +273,21 @@ class CoreTests(unittest.TestCase):
                            'evidence':['ux-review-1']}]
         self.assertIn('delegation_astra_effort_above_ceiling:ux1', gate(p, 'closeout')['issues'])
 
+    def test_dispatch_receipt_cannot_relabel_target_profile_or_use_astra_for_writer(self):
+        p=packet('write_product', 'implementer', 'IMPLEMENTATION')
+        p['runtime'].update(dispatch_required=True, required_agent_type='implementer__sol_medium',
+                            required_profile='sol_high', dispatch_receipt={
+            'status':'completed','agent_type':'implementer__sol_medium','fork_turns':'none',
+            'child_reference':'child1','evidence':['child-terminal-1'],
+            'model_observed':'gpt-5.6-sol','effort_observed':'medium'})
+        self.assertIn('dispatch_required_profile_mismatch', gate(p, 'closeout')['issues'])
+        p['runtime'].update(required_agent_type='implementer__astra_medium', required_profile='astra_medium',
+                            dispatch_receipt={'status':'completed','agent_type':'implementer__astra_medium',
+                                              'fork_turns':'none','child_reference':'child1',
+                                              'evidence':['child-terminal-1'],'model_observed':'gpt-6-astra',
+                                              'effort_observed':'medium'})
+        self.assertIn('dispatch_astra_role_not_analytic', gate(p, 'closeout')['issues'])
+
     def test_team_preparation_before_user(self):
         p=packet();p['pending']=[{'id':'test1','status':'needs_team_handoff','authorized':True,'available':True}]
         self.assertEqual(next_action(p)['action'],'team_handoff');self.assertFalse(gate(p,'closeout')['passed'])
