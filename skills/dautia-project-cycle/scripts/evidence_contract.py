@@ -33,9 +33,11 @@ EVIDENCE_STATUSES = {
     "superseded", "contradicted",
 }
 SOURCE_KINDS = {
-    "user_statement", "code", "spec", "config", "test", "browser",
-    "simulator", "device", "provider", "server", "review", "artifact",
-    "telemetry", "docs", "unknown",
+    "user_statement", "code", "spec", "config", "test", "tool_result",
+    "build", "command", "ci", "git", "browser", "simulator", "device",
+    "provider", "server", "review", "artifact", "telemetry", "docs",
+    "human_observation", "app_store", "vercel", "supabase", "typesafe",
+    "openclaw", "unknown",
 }
 DOC_STATUSES = {"complete", "partial", "scratch", "unknown", "in_progress"}
 MAX_TEXT = 4_000
