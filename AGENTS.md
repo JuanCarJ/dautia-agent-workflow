@@ -24,6 +24,17 @@ en `dautia-project-cycle/config/routing-policy.json`, no dentro del método de c
 skill. No confundir el default del principal con los perfiles de sus trabajadores.
 Antes de despachar, usar `dispatch-plan` y el destino verificado que devuelve;
 no reemplazarlo por el rol base ni inferir el modelo ejecutado por el solicitado.
+En una delegación material, el packet debe conservar `runtime.required_agent_type`
+(`ROLE__PROFILE`) y el resultado nativo debe registrar ese mismo destino,
+`fork_turns: "none"`, modelo/esfuerzo observados, referencia del hijo y evidencia
+terminal. Un `worker`/`code_explorer` genérico, `fork_turns: "all"`, perfil
+ausente o distinto, o hijo incompleto (incluido capacity) es una violación y
+bloquea el cierre; no se sustituye por un artefacto escrito por el principal.
+Si `work.visual_scope` es `broad` o `redesign`, el cierre exige conservar la
+base visual (`runtime.design_baseline_evidence`), capturas del viewport real,
+comprobación responsive y accesibilidad, además de una delegación recibida a
+`ux_auditor__PROFILE`. Los tests funcionales por sí solos no certifican una
+interfaz ni justifican reemplazar el diseño existente.
 El routing local usa medium/high para implementación preparada y Sol high o una
 consulta Astra low/medium para análisis,
 arquitectura, UX, auditoría, estrategia de pruebas o diagnóstico que lo justifique.

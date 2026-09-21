@@ -19,6 +19,27 @@ from workflow_store import emit, safe_path
 from workflow_delivery import mark_started, reserve_dispatch
 
 
+def validate_spawn_report(prepared: dict, returned: dict) -> list[str]:
+    """Validate the host's observed native spawn contract.
+
+    A prepared plan is only a request.  The host must echo the role-qualified
+    target, the bounded delegation depth and the effective profile.  Missing
+    observations are failures of the dispatch contract, not implicit passes.
+    """
+    if not isinstance(returned, dict):
+        return ['native_response_not_object']
+    issues: list[str] = []
+    if returned.get('agent_type') != prepared.get('agent_type'):
+        issues.append('agent_type_mismatch')
+    if returned.get('fork_turns') != 'none':
+        issues.append('fork_turns_must_be_none')
+    if returned.get('model') != prepared.get('model_requested'):
+        issues.append('reported_model_mismatch')
+    if returned.get('model_reasoning_effort') != prepared.get('effort_requested'):
+        issues.append('reported_effort_mismatch')
+    return issues
+
+
 def prepare_dispatch(packet: dict, decision: dict, agents_dir: Path) -> dict:
     checked = gate(packet, 'dispatch')
     if not checked['passed']:
@@ -42,6 +63,10 @@ def prepare_dispatch(packet: dict, decision: dict, agents_dir: Path) -> dict:
     if decision.get('dispatch_target') != target:
         raise ContractError('dispatch_target_mismatch')
     runtime = packet.get('runtime', {})
+    if (runtime.get('dispatch_required') is not True
+            or runtime.get('required_agent_type') != target
+            or runtime.get('required_profile') != selected):
+        raise ContractError('dispatch_requirement_not_bound')
     if runtime.get('harness') != 'codex' or target not in runtime.get('available_targets', []):
         raise ContractError('native_target_not_observed')
     path = agents_dir / (target + '.toml')
@@ -77,7 +102,9 @@ def prepare_dispatch(packet: dict, decision: dict, agents_dir: Path) -> dict:
               'definition_hash': hashlib.sha256(raw).hexdigest(), 'context_hash': fingerprint(packet),
               'policy_hash': fingerprint(policy()), 'decision_hash': fingerprint(decision),
               'dispatch_performed': False, 'model_reported': None, 'effort_reported': None,
-              'native_enforcement_verified': False, 'authorizes_action': False}
+              'native_enforcement_verified': False, 'authorizes_action': False,
+              'fork_turns_requested': 'none', 'required_agent_type': target,
+              'required_profile': selected}
     # Runtime timings and external metadata can vary between identical
     # evaluations. They belong in the audit plan, not the idempotency key.
     result['dispatch_key'] = fingerprint({
@@ -132,7 +159,7 @@ def dispatch_prepared(packet: dict, decision: dict, prepared: dict, agents_dir: 
     # Context goes to the worker, never into the statistical event stream.
     message = 'Execute only this delegated packet within its authority; return evidence to the principal.\n' + canonical(packet).decode()
     try:
-        returned = spawn({'agent_type': current['agent_type'], 'message': message})
+        returned = spawn({'agent_type': current['agent_type'], 'fork_turns': 'none', 'message': message})
     except Exception:
         return dict(current, status='dispatch_outcome_unknown', dispatch_performed=None,
                     reason='reconcile_before_retry', dispatch_id=dispatch_id)
@@ -155,11 +182,13 @@ def dispatch_prepared(packet: dict, decision: dict, prepared: dict, agents_dir: 
                         child_reference=child, reason='dispatch_ledger_write_unknown',
                         delivery_received=False, dispatch_id=dispatch_id)
     model, effort = returned.get('model'), returned.get('model_reasoning_effort')
-    mismatch = (model is not None and model != current['model_requested'] or
-                effort is not None and effort != current['effort_requested'])
-    result = dict(current, status='runtime_profile_mismatch' if mismatch else 'started',
+    contract_issues = validate_spawn_report(current, returned)
+    mismatch = bool(contract_issues)
+    result = dict(current, status='dispatch_contract_violation' if mismatch else 'started',
                   dispatch_performed=True, child_reference=child, model_reported=model,
-                  effort_reported=effort, delivery_received=False, dispatch_id=dispatch_id)
+                  effort_reported=effort, delivery_received=False, dispatch_id=dispatch_id,
+                  native_enforcement_verified=not mismatch,
+                  dispatch_contract_issues=contract_issues)
     if events_root is not None:
         # Only opaque correlation escapes into telemetry; no prompts or native IDs.
         run = 'child-' + hashlib.sha256(child.encode()).hexdigest()[:24]

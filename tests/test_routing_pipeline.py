@@ -8,7 +8,7 @@ from unittest.mock import Mock
 
 from test_r3_core import packet
 from workflow_core import ContractError, fingerprint, policy, profile_selection, routing_arguments
-from workflow_dispatch import prepare_dispatch, dispatch_prepared
+from workflow_dispatch import prepare_dispatch, dispatch_prepared, validate_spawn_report
 from workflow_store import export_events
 import sys
 ROOT = Path(__file__).resolve().parents[1]
@@ -37,6 +37,9 @@ class RoutingPipelineTests(unittest.TestCase):
         p['work'].update(decisions_resolved=True, execution_difficulty=difficulty)
         p['runtime']['available_profiles'] = list(policy()['profiles'])
         p['runtime']['available_targets'] = self.targets
+        p['runtime'].update(dispatch_required=True,
+                            required_agent_type='implementer__' + ('sol_medium' if difficulty == 'routine' else 'sol_high'),
+                            required_profile='sol_medium' if difficulty == 'routine' else 'sol_high')
         return p
 
     def decision(self, p):
@@ -81,7 +84,9 @@ class RoutingPipelineTests(unittest.TestCase):
     def test_dispatch_is_exactly_once_and_reconciled(self):
         p = self.work(); decision = self.decision(p)
         plan = prepare_dispatch(p, decision, self.agents)
-        spawn = Mock(return_value={'agent_id': 'native-child-1', 'model': 'gpt-5.6-sol',
+        spawn = Mock(return_value={'agent_id': 'native-child-1',
+                                   'agent_type': 'implementer__sol_medium',
+                                   'fork_turns': 'none', 'model': 'gpt-5.6-sol',
                                    'model_reasoning_effort': 'medium'})
         ledger = self.root / 'ledger'
         result = dispatch_prepared(p, decision, plan, self.agents, spawn,
@@ -94,6 +99,34 @@ class RoutingPipelineTests(unittest.TestCase):
         spawn.assert_called_once()
         self.assertEqual([e['event_type'] for e in export_events(self.root / 'events', 'obj1')['events']],
                          ['dispatch.requested', 'agent.started'])
+
+    def test_spawn_report_requires_exact_role_and_bounded_depth(self):
+        p = self.work(); plan = prepare_dispatch(p, self.decision(p), self.agents)
+        self.assertEqual(validate_spawn_report(plan, {
+            'agent_type': 'implementer__sol_medium', 'fork_turns': 'none',
+            'model': 'gpt-5.6-sol', 'model_reasoning_effort': 'medium'}), [])
+        self.assertIn('agent_type_mismatch', validate_spawn_report(plan, {
+            'agent_type': 'worker', 'fork_turns': 'none', 'model': 'gpt-5.6-sol',
+            'model_reasoning_effort': 'medium'}))
+        self.assertIn('fork_turns_must_be_none', validate_spawn_report(plan, {
+            'agent_type': 'implementer__sol_medium', 'fork_turns': 'all',
+            'model': 'gpt-5.6-sol', 'model_reasoning_effort': 'medium'}))
+
+    def test_dispatch_contract_violation_is_preserved_after_child_start(self):
+        p = self.work(); decision = self.decision(p); plan = prepare_dispatch(p, decision, self.agents)
+        spawn = Mock(return_value={'agent_id': 'native-child-2', 'agent_type': 'worker',
+                                   'fork_turns': 'all', 'model': 'gpt-5.6-sol',
+                                   'model_reasoning_effort': 'medium'})
+        result = dispatch_prepared(p, decision, plan, self.agents, spawn)
+        self.assertEqual(result['status'], 'dispatch_contract_violation')
+        self.assertTrue(result['dispatch_performed'])
+        self.assertFalse(result['native_enforcement_verified'])
+        self.assertIn('agent_type_mismatch', result['dispatch_contract_issues'])
+
+    def test_dispatch_requires_requirement_to_be_bound_in_packet(self):
+        p = self.work(); p['runtime'].pop('dispatch_required'); p['runtime'].pop('required_agent_type'); p['runtime'].pop('required_profile')
+        with self.assertRaisesRegex(ContractError, 'dispatch_requirement_not_bound'):
+            prepare_dispatch(p, self.decision(p), self.agents)
 
     def test_unresolved_decisions_block_before_dispatch(self):
         p = self.work(); p['work']['decisions_resolved'] = False

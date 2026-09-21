@@ -197,6 +197,82 @@ class CoreTests(unittest.TestCase):
         p=packet();p['delegations']=[{'id':'child1','state':'ended','candidate_hash':fingerprint(p['candidate']),'evidence':['e1']}]
         self.assertIn('handoff_missing_or_stale:child1',gate(p,'closeout')['issues'])
 
+    def test_required_dispatch_receipt_blocks_incomplete_or_generic_child(self):
+        p=packet('write_product', 'implementer', 'IMPLEMENTATION')
+        p['runtime'].update(dispatch_required=True, required_agent_type='implementer__sol_medium',
+                            required_profile='sol_medium')
+        issues = gate(p, 'closeout')['issues']
+        self.assertIn('dispatch_receipt_required', issues)
+        p['runtime']['dispatch_receipt'] = {
+            'status': 'incomplete', 'agent_type': 'worker', 'fork_turns': 'all',
+            'child_reference': 'child1', 'evidence': ['capacity-error'],
+            'model_observed': 'gpt-5.6-sol', 'effort_observed': 'medium'}
+        issues = gate(p, 'closeout')['issues']
+        self.assertIn('child_incomplete', issues)
+        self.assertIn('dispatch_agent_type_mismatch', issues)
+        self.assertIn('dispatch_fork_turns_must_be_none', issues)
+
+    def test_required_dispatch_receipt_accepts_exact_completed_child(self):
+        p=packet('write_product', 'implementer', 'IMPLEMENTATION')
+        p['runtime'].update(dispatch_required=True, required_agent_type='implementer__sol_medium',
+                            required_profile='sol_medium', dispatch_receipt={
+            'status':'completed', 'agent_type':'implementer__sol_medium', 'fork_turns':'none',
+            'child_reference':'child1', 'evidence':['child-terminal-1'],
+            'model_observed':'gpt-5.6-sol', 'effort_observed':'medium'})
+        self.assertTrue(gate(p, 'closeout')['passed'])
+
+    def test_broad_visual_change_needs_baseline_viewport_and_ux_review(self):
+        p=packet('write_product', 'implementer', 'IMPLEMENTATION')
+        p['work']['visual_scope'] = 'broad'
+        issues = gate(p, 'closeout')['issues']
+        self.assertIn('visual_design_baseline_required', issues)
+        self.assertIn('visual_validation_required', issues)
+        p['runtime'].update(
+            design_baseline_evidence=['baseline-1'],
+            visual_validation={'viewport':'1440x900', 'screenshots':['after-1'],
+                                'responsive_checked':True, 'accessibility_checked':True})
+        p['delegations']=[{'id':'ux1','required':True,'required_agent_type':'ux_auditor__sol_high',
+                           'agent_type':'ux_auditor__sol_high','fork_turns':'none',
+                           'model_observed':'gpt-5.6-sol','effort_observed':'high',
+                           'state':'received','candidate_hash':fingerprint(p['candidate']),
+                           'evidence':['ux-review-1']}]
+        self.assertTrue(gate(p, 'closeout')['passed'])
+
+    def test_broad_visual_change_rejects_generic_or_unbounded_ux_review(self):
+        p=packet('write_product', 'implementer', 'IMPLEMENTATION'); p['work']['visual_scope']='redesign'
+        p['runtime'].update(design_baseline_evidence=['baseline-1'],
+                            visual_validation={'viewport':'390x844','screenshots':['after-1'],
+                                               'responsive_checked':True,'accessibility_checked':True})
+        p['delegations']=[{'id':'ux1','required':True,'required_agent_type':'ux_auditor__sol_high',
+                           'agent_type':'worker','fork_turns':'all','model_observed':'gpt-5.6-sol',
+                           'effort_observed':'high','state':'received',
+                           'candidate_hash':fingerprint(p['candidate']),'evidence':['ux-review-1']}]
+        issues=gate(p,'closeout')['issues']
+        self.assertIn('delegation_agent_type_mismatch:ux1',issues)
+        self.assertIn('delegation_fork_turns_must_be_none:ux1',issues)
+
+    def test_broad_visual_change_cannot_pass_with_optional_ux_stub(self):
+        p=packet('write_product', 'implementer', 'IMPLEMENTATION'); p['work']['visual_scope']='broad'
+        p['runtime'].update(design_baseline_evidence=['baseline-1'],
+                            visual_validation={'viewport':'1440x900','screenshots':['after-1'],
+                                               'responsive_checked':True,'accessibility_checked':True})
+        p['delegations']=[{'id':'ux1','required':False,'required_agent_type':'ux_auditor__sol_high',
+                           'agent_type':'ux_auditor__sol_high','fork_turns':'none',
+                           'model_observed':'gpt-5.6-sol','effort_observed':'high'}]
+        self.assertIn('ux_auditor_delegation_required', gate(p, 'closeout')['issues'])
+
+    def test_broad_visual_change_rejects_astra_above_medium(self):
+        p=packet('write_product', 'implementer', 'IMPLEMENTATION'); p['work']['visual_scope']='broad'
+        p['runtime'].update(design_baseline_evidence=['baseline-1'],
+                            visual_validation={'viewport':'1440x900','screenshots':['after-1'],
+                                               'responsive_checked':True,'accessibility_checked':True})
+        p['delegations']=[{'id':'ux1','required':True,'required_agent_type':'ux_auditor__astra_high',
+                           'agent_type':'ux_auditor__astra_high','fork_turns':'none',
+                           'model_observed':'gpt-6-astra','effort_observed':'high',
+                           'state':'received','candidate_hash':fingerprint(p['candidate']),
+                           'evidence':['ux-review-1']}]
+        self.assertIn('delegation_astra_effort_above_ceiling:ux1', gate(p, 'closeout')['issues'])
+
     def test_team_preparation_before_user(self):
         p=packet();p['pending']=[{'id':'test1','status':'needs_team_handoff','authorized':True,'available':True}]
         self.assertEqual(next_action(p)['action'],'team_handoff');self.assertFalse(gate(p,'closeout')['passed'])
