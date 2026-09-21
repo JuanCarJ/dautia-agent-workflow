@@ -38,7 +38,9 @@ python3 scripts/install.py --profile codex-macos --scope workflow --check
 nivel raíz de config.toml. No modifica credenciales, MCP, roles personalizados,
 sesiones activas ni límites administrados. Los defaults de los trabajadores
 canónicos se instalan según el perfil del host: principal high, implementer medium
-y variantes explícitas medium/high para el despacho; no heredan Astra accidentalmente.
+y variantes Sol medium/high para el despacho. Una definición Astra high heredada
+puede existir para roles read-only, pero queda bloqueada por la política y no se
+selecciona ni despacha; los workers no heredan Astra accidentalmente.
 Los archivos de versiones anteriores que ya no administra esta revisión no se
 borran automáticamente. Reconciliarlos si colisionan con el catálogo activo.
 

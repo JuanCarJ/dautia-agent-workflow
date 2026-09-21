@@ -78,6 +78,14 @@ def prepare_dispatch(packet: dict, decision: dict, agents_dir: Path) -> dict:
               'policy_hash': fingerprint(policy()), 'decision_hash': fingerprint(decision),
               'dispatch_performed': False, 'model_reported': None, 'effort_reported': None,
               'native_enforcement_verified': False, 'authorizes_action': False}
+    # Runtime timings and Jev response metadata can vary between identical
+    # evaluations. They belong in the audit plan, not the idempotency key.
+    result['dispatch_key'] = fingerprint({
+        'objective_id': packet['objective_id'], 'project_id': packet['project_id'],
+        'block_id': str(packet.get('work', {}).get('block_id', 'root-block')),
+        'attempt': str(packet.get('work', {}).get('attempt', 'attempt-1')),
+        'profile_id': selected, 'context_hash': result['context_hash'],
+        'policy_hash': result['policy_hash'], 'definition_hash': result['definition_hash']})
     result['plan_hash'] = fingerprint(result)
     return result
 
@@ -103,13 +111,14 @@ def dispatch_prepared(packet: dict, decision: dict, prepared: dict, agents_dir: 
             block_id=str(packet.get('work', {}).get('block_id', 'root-block')),
             attempt=str(packet.get('work', {}).get('attempt', 'attempt-1')),
             profile=current['profile_id'], candidate_hash=fingerprint(packet.get('candidate', {})),
-            packet_hash=current['context_hash'], dispatch_key=current['plan_hash'])
+            packet_hash=current['context_hash'], dispatch_key=current['dispatch_key'])
         if reservation['status'] == 'reconcile_required':
             return dict(current, status='dispatch_outcome_unknown', dispatch_performed=None,
-                        reason='reconcile_before_retry', reservation=reservation)
+                        reason='reconcile_before_retry', dispatch_id=reservation['dispatch']['dispatch_id'], reservation=reservation)
         if reservation['status'] == 'reused':
             return dict(current, status='dispatch_already_reserved', dispatch_performed=False,
-                        reason='identical_dispatch_reused', reservation=reservation)
+                        reason='identical_dispatch_reused', dispatch_id=reservation['dispatch']['dispatch_id'], reservation=reservation)
+    dispatch_id = reservation['dispatch']['dispatch_id'] if reservation is not None else None
     event = {'objective_id': packet['objective_id'], 'project_id': packet['project_id'],
              'profile_requested': current['profile_id'], 'profile_configured': current['profile_id'],
              'context_hash': current['context_hash'], 'policy_hash': current['policy_hash'],
@@ -126,27 +135,31 @@ def dispatch_prepared(packet: dict, decision: dict, prepared: dict, agents_dir: 
         returned = spawn({'agent_type': current['agent_type'], 'message': message})
     except Exception:
         return dict(current, status='dispatch_outcome_unknown', dispatch_performed=None,
-                    reason='reconcile_before_retry')
+                    reason='reconcile_before_retry', dispatch_id=dispatch_id)
     if not isinstance(returned, dict):
         return dict(current, status='dispatch_outcome_unknown', dispatch_performed=None,
-                    reason='unrecognized_native_response')
+                    reason='unrecognized_native_response', dispatch_id=dispatch_id)
     child = returned.get('agent_id') or returned.get('thread_id') or returned.get('id')
     if not isinstance(child, str) or not child:
         return dict(current, status='dispatch_outcome_unknown', dispatch_performed=None,
-                        reason='native_child_identity_missing')
+                        reason='native_child_identity_missing', dispatch_id=dispatch_id)
     if ledger_root is not None:
         try:
-            mark_started(ledger_root, reservation['dispatch']['dispatch_id'], child)
+            started = mark_started(ledger_root, reservation['dispatch']['dispatch_id'], child)
+            if started.get('status') == 'reconcile_required':
+                return dict(current, status='dispatch_outcome_unknown', dispatch_performed=True,
+                            child_reference=child, reason='dispatch_child_identity_conflict',
+                            delivery_received=False, dispatch_id=dispatch_id)
         except Exception:
             return dict(current, status='dispatch_outcome_unknown', dispatch_performed=True,
                         child_reference=child, reason='dispatch_ledger_write_unknown',
-                        delivery_received=False)
+                        delivery_received=False, dispatch_id=dispatch_id)
     model, effort = returned.get('model'), returned.get('model_reasoning_effort')
     mismatch = (model is not None and model != current['model_requested'] or
                 effort is not None and effort != current['effort_requested'])
     result = dict(current, status='runtime_profile_mismatch' if mismatch else 'started',
                   dispatch_performed=True, child_reference=child, model_reported=model,
-                  effort_reported=effort, delivery_received=False)
+                  effort_reported=effort, delivery_received=False, dispatch_id=dispatch_id)
     if events_root is not None:
         # Only opaque correlation escapes into telemetry; no prompts or native IDs.
         run = 'child-' + hashlib.sha256(child.encode()).hexdigest()[:24]

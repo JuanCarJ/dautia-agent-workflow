@@ -297,6 +297,9 @@ def gate(packet: dict, stage: str = "preflight") -> dict:
     issues: list[str] = []
     warns: list[str] = []
     component_evidence = packet.get("component_evidence")
+    required_components = packet.get("required_components", [])
+    if stage in ("closeout", "release") and required_components and component_evidence is None:
+        issues.extend("required_component_evidence_missing:" + str(x) for x in required_components)
     if component_evidence is not None:
         if not isinstance(component_evidence, list):
             issues.append("component_evidence_must_be_list")
@@ -316,11 +319,20 @@ def gate(packet: dict, stage: str = "preflight") -> dict:
                     issues.append("invalid_component_checks:" + name)
                 if not isinstance(component.get("depends_on", []), list) or not all(isinstance(x, str) and x for x in component.get("depends_on", [])):
                     issues.append("invalid_component_dependencies:" + name)
-            required_components = packet.get("required_components", [])
             missing_components = sorted(set(required_components) - seen_components) if isinstance(required_components, list) else []
             issues.extend("required_component_evidence_missing:" + x for x in missing_components)
-            if "contract_changed" in packet.get("shared_contracts", []) and any(not x.get("depends_on") for x in component_evidence if isinstance(x, dict)):
-                issues.append("shared_contract_dependency_missing")
+            if "contract_changed" in packet.get("shared_contracts", []):
+                for component in component_evidence:
+                    if isinstance(component, dict) and component.get("status") == "dependent" and not component.get("depends_on"):
+                        issues.append("shared_contract_dependency_missing:" + component["component"])
+            if stage in ("closeout", "release"):
+                for component in component_evidence:
+                    if not isinstance(component, dict) or component.get("component") not in required_components:
+                        continue
+                    if component.get("status") == "blocked":
+                        issues.append("required_component_blocked:" + component["component"])
+                    if not component.get("checks"):
+                        issues.append("required_component_checks_missing:" + component["component"])
     material = w.get("material", True) or operation in ("write_product", "write_tests", "git_write", "external_mutation")
     mutating = operation not in ("read",)
     authority = packet.get("authority", {})
@@ -368,7 +380,7 @@ def gate(packet: dict, stage: str = "preflight") -> dict:
         if not refs(packet.get("coherence_evidence")):
             issues.append("coherence_review_required")
         if packet.get("context_complete") is not True:
-            issues.append("context_incomplete")
+            (warns if operation == "read" else issues).append("context_incomplete")
         for source in packet.get("sources", []):
             if source.get("expected_hash") != source.get("observed_hash") or not nonempty(source.get("observed_hash")):
                 issues.append("stale_source:" + source["id"])

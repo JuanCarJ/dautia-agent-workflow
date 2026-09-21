@@ -187,6 +187,18 @@ class RoutingPipelineTests(unittest.TestCase):
         self.assertEqual([e['event_type'] for e in events],['dispatch.requested','agent.started'])
         self.assertNotIn('message',json.dumps(events));self.assertNotIn('native-child-1',json.dumps(events))
 
+    def test_dispatch_identity_ignores_variable_plan_timing_and_returns_id(self):
+        p=self.work(); r=self.evaluate(p); plan=prepare_dispatch(p,r,self.agents)
+        changed=copy.deepcopy(r); changed['duration_ms'] = r.get('duration_ms', 0) + 99
+        changed_plan=prepare_dispatch(p, changed, self.agents)
+        self.assertEqual(plan['dispatch_key'], changed_plan['dispatch_key'])
+        self.assertNotEqual(plan['plan_hash'], changed_plan['plan_hash'])
+        ledger=self.root/'ledger'; spawn=Mock(return_value={'agent_id':'native-child-1'})
+        result=dispatch_prepared(p, changed, changed_plan, self.agents, spawn, ledger_root=ledger)
+        self.assertEqual(result['status'], 'started'); self.assertTrue(result['dispatch_id'])
+        reused=dispatch_prepared(p, changed, changed_plan, self.agents, spawn, ledger_root=ledger)
+        self.assertEqual(reused['status'], 'dispatch_already_reserved'); spawn.assert_called_once()
+
     def test_stale_context_policy_or_target_never_spawns(self):
         for field in ('context','policy','target'):
             with self.subTest(field=field):
