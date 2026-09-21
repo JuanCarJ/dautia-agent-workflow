@@ -55,7 +55,10 @@ STAGE_FIELDS = {
     'brief': ('objective_id', 'project_id', 'outcome', 'work', 'requirements'),
     'impact': ('objective_id', 'project_id', 'outcome', 'work', 'requirements', 'impacts', 'sources'),
     'continuity': ('objective_id', 'project_id', 'outcome', 'candidate', 'spec_changes', 'decisions', 'authority', 'control'),
-    'route': ('objective_id', 'project_id', 'outcome', 'work', 'requirements', 'runtime', 'authority', 'control'),
+    # Routing needs the evidence frontier to distinguish routine execution from
+    # genuinely unresolved analysis. These records remain field/depth bounded
+    # by _project_record and _sanitize_value.
+    'route': ('objective_id', 'project_id', 'outcome', 'work', 'requirements', 'sources', 'impacts', 'pending', 'findings', 'runtime', 'authority', 'control'),
     'context': ('objective_id', 'project_id', 'outcome', 'work', 'requirements', 'optional_context', 'sources', 'skills'),
     'progress': ('objective_id', 'project_id', 'outcome', 'work', 'candidate', 'pending', 'delegations', 'findings', 'control'),
     'closeout': ('objective_id', 'project_id', 'outcome', 'completion_claim', 'work', 'candidate', 'requirements', 'test_expectations', 'checks', 'review', 'delegations', 'pending'),
