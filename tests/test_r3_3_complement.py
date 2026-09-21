@@ -84,5 +84,22 @@ class ComplementTests(unittest.TestCase):
         self.assertNotIn('transcript', rendered); self.assertNotIn('PRIVATE FULL CHAT', rendered)
         self.assertNotIn('SECRETCHAT', rendered); self.assertNotIn('PRIVATE', rendered)
 
+    def test_route_projection_includes_bounded_evidence_frontier(self):
+        import jev_support as jev
+        p = packet()
+        p['impacts'] = [{'id': 'impact-1', 'treatment': 'covered', 'rationale': 'bounded',
+                         'blocking': False, 'check_ids': ['C1'], 'evidence': ['obs-1']}]
+        p['pending'] = [{'id': 'pending-1', 'required': False, 'status': 'none',
+                         'authorized': True, 'available': True, 'monitor_confirmed': False}]
+        p['findings'] = [{'id': 'finding-1', 'kind': 'evidence',
+                          'summary': 'source and acceptance are aligned', 'resolved': True,
+                          'evidence': ['obs-1']}]
+        request = jev.build_request('route', p, jev.defaults())
+        for field in ('sources', 'impacts', 'pending', 'findings'):
+            self.assertIn(field, request['state'])
+        p['findings'][0]['summary_private_prompt'] = 'PRIVATE'
+        request = jev.build_request('route', p, jev.defaults())
+        self.assertNotIn('summary_private_prompt', json.dumps(request))
+
 
 if __name__ == '__main__': unittest.main()
