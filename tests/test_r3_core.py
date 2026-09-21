@@ -209,7 +209,7 @@ class RoutingTests(unittest.TestCase):
     def test_explicit_high_no_silent_downgrade(self):
         e={'profile':'astra_high','source_kind':'user','source_refs':['user1']}
         result=profile_selection('systems_analyst','read',analysis=True,explicit=e,available=['astra_high'])
-        self.assertEqual(result['selected'],'astra_high')
+        self.assertIsNone(result['selected']);self.assertEqual(result['status'],'blocked');self.assertEqual(result['reason'],'profile_above_astra_ceiling')
         result=profile_selection('systems_analyst','read',analysis=True,explicit=e,available=['sol_high'])
         self.assertIsNone(result['selected']);self.assertEqual(result['status'],'blocked')
 

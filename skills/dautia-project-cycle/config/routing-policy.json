@@ -2,6 +2,7 @@
   "schema_version": 1,
   "policy_revision": "r3.2",
   "default_profile": "sol_high",
+  "maximum_astra_effort": "medium",
   "ordinary_analysis_profiles": [
     "sol_high",
     "astra_low",
