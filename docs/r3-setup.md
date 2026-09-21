@@ -64,6 +64,12 @@ low/medium queda limitada a análisis con evidencia del principal. Ninguna selec
 local constituye prueba de que el host cargó el modelo: el adaptador debe comprobar
 el archivo de definición y el perfil efectivo.
 
+Una instalación previa puede conservar un launcher local de Jev o una personalización
+fuera del conjunto administrado. El rollback no lo borra automáticamente: primero se
+comprueba su origen y se conserva el respaldo; cualquier retirada explícita requiere
+autoridad separada y lectura posterior. Que exista ese comando heredado no lo vuelve
+parte del dispatch ni del camino crítico de esta versión.
+
 ## Hooks y límites efectivos
 
 Se genera `hooks.r3.candidate.json`, NO se copia a hooks.json ni se otorga confianza.
