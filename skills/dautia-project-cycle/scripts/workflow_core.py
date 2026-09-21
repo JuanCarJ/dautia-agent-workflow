@@ -372,6 +372,8 @@ def visual_surface_issues(packet: dict, stage: str) -> list[str]:
         issues.append("visual_viewport_required")
     if not refs(validation.get("screenshots")):
         issues.append("visual_screenshot_evidence_required")
+    if not refs(validation.get("content_checks")):
+        issues.append("visual_content_acceptance_required")
     if validation.get("responsive_checked") is not True:
         issues.append("visual_responsive_check_required")
     if validation.get("accessibility_checked") is not True:

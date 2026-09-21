@@ -56,6 +56,9 @@ El callback debe devolver el mismo `agent_type` cualificado que preparó el plan
 conserva además un `runtime.dispatch_receipt` terminal con `status: "completed"`,
 referencia y evidencia. Un worker genérico, profundidad `all`, ausencia de perfil
 o hijo incompleto (incluido capacity) queda como violación y bloquea closeout/release.
+En una superficie visual amplia, `visual_validation.content_checks` debe enlazar
+la aceptación de contenido visible (explicaciones, estados, colores o acciones
+que el usuario debe entender); una captura sin esa lectura no es evidencia suficiente.
 
 ## Evaluación
 

@@ -78,7 +78,8 @@ Generic `worker`/`code_explorer`, missing or mismatched profile, `fork_turns:
 closeout; the principal cannot replace that receipt with its own artifact.
 For an explicitly broad visual scope (`work.visual_scope: broad|redesign`), retain
 the design baseline, real-viewport screenshots, responsive and accessibility
-checks, and an independent `ux_auditor__PROFILE` handoff. Functional tests do not
+checks, explicit visible-content checks (for example, an analysis explanation and
+its color mapping), and an independent `ux_auditor__PROFILE` handoff. Functional tests do not
 prove visual hierarchy, continuity with the existing design, or user impact.
 A prepared JSON request is not a spawned child: record its actual start/report and
 receive its delivery. The CLI does not intercept the native tool. A principal choice

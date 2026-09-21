@@ -230,6 +230,7 @@ class CoreTests(unittest.TestCase):
         p['runtime'].update(
             design_baseline_evidence=['baseline-1'],
             visual_validation={'viewport':'1440x900', 'screenshots':['after-1'],
+                                'content_checks':['kmeans-explanation-visible','color-mapping-visible'],
                                 'responsive_checked':True, 'accessibility_checked':True})
         p['delegations']=[{'id':'ux1','required':True,'required_agent_type':'ux_auditor__sol_high',
                            'agent_type':'ux_auditor__sol_high','fork_turns':'none',
@@ -242,6 +243,7 @@ class CoreTests(unittest.TestCase):
         p=packet('write_product', 'implementer', 'IMPLEMENTATION'); p['work']['visual_scope']='redesign'
         p['runtime'].update(design_baseline_evidence=['baseline-1'],
                             visual_validation={'viewport':'390x844','screenshots':['after-1'],
+                                               'content_checks':['visual-content-1'],
                                                'responsive_checked':True,'accessibility_checked':True})
         p['delegations']=[{'id':'ux1','required':True,'required_agent_type':'ux_auditor__sol_high',
                            'agent_type':'worker','fork_turns':'all','model_observed':'gpt-5.6-sol',
@@ -255,6 +257,7 @@ class CoreTests(unittest.TestCase):
         p=packet('write_product', 'implementer', 'IMPLEMENTATION'); p['work']['visual_scope']='broad'
         p['runtime'].update(design_baseline_evidence=['baseline-1'],
                             visual_validation={'viewport':'1440x900','screenshots':['after-1'],
+                                               'content_checks':['visual-content-1'],
                                                'responsive_checked':True,'accessibility_checked':True})
         p['delegations']=[{'id':'ux1','required':False,'required_agent_type':'ux_auditor__sol_high',
                            'agent_type':'ux_auditor__sol_high','fork_turns':'none',

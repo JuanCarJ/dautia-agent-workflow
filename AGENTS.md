@@ -32,7 +32,7 @@ ausente o distinto, o hijo incompleto (incluido capacity) es una violación y
 bloquea el cierre; no se sustituye por un artefacto escrito por el principal.
 Si `work.visual_scope` es `broad` o `redesign`, el cierre exige conservar la
 base visual (`runtime.design_baseline_evidence`), capturas del viewport real,
-comprobación responsive y accesibilidad, además de una delegación recibida a
+comprobación responsive, accesibilidad y `visual_validation.content_checks`, además de una delegación recibida a
 `ux_auditor__PROFILE`. Los tests funcionales por sí solos no certifican una
 interfaz ni justifican reemplazar el diseño existente.
 El routing local usa medium/high para implementación preparada y Sol high o una
