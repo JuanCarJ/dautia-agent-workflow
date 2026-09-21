@@ -22,6 +22,7 @@ import sqlite3
 import stat
 import sys
 import tempfile
+import ssl
 import urllib.error
 import urllib.request
 from typing import Any, Callable
@@ -316,10 +317,20 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         raise SupportError('redirect_refused')
 
 
+def tls_context() -> ssl.SSLContext:
+    """Use the platform context, preferring certifi when the Python runtime lacks a CA bundle."""
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except (ImportError, OSError, TypeError):
+        return ssl.create_default_context()
+
+
 def http_transport(request: dict, key: str, cfg: dict) -> dict:
     req = urllib.request.Request(ENDPOINT, data=dumps(request), method='POST', headers={
         'Authorization':'Bearer ' + key, 'Content-Type':'application/json', 'Accept':'application/json'})
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect(),
+                                         urllib.request.HTTPSHandler(context=tls_context()))
     try:
         with opener.open(req, timeout=cfg['timeout_seconds']) as response:
             data = response.read(cfg['max_response_bytes'] + 1)
@@ -328,7 +339,11 @@ def http_transport(request: dict, key: str, cfg: dict) -> dict:
             return loads(data)
     except urllib.error.HTTPError as exc:
         raise SupportError('http_' + str(exc.code)) from None
-    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+    except urllib.error.URLError as exc:
+        if isinstance(exc.reason, ssl.SSLCertVerificationError):
+            raise SupportError('tls_certificate_verification_failed') from None
+        raise SupportError('network_unavailable_or_timeout') from None
+    except (TimeoutError, OSError) as exc:
         raise SupportError('network_unavailable_or_timeout') from None
 
 
