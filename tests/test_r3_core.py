@@ -316,6 +316,14 @@ class CoreTests(unittest.TestCase):
                            'evidence':['analysis-1']}]
         self.assertIn('delegation_explicit_override_required:analysis1', gate(p, 'closeout')['issues'])
 
+    def test_delegation_rejects_generic_required_agent_type(self):
+        p=packet('write_product', 'implementer', 'IMPLEMENTATION')
+        p['delegations']=[{'id':'child1','required':True,'required_agent_type':'worker',
+                           'agent_type':'worker','fork_turns':'none','state':'received',
+                           'candidate_hash':fingerprint(p['candidate']),
+                           'evidence':['child-1']}]
+        self.assertIn('delegation_agent_type_role_qualified_required:child1', gate(p, 'closeout')['issues'])
+
     def test_team_preparation_before_user(self):
         p=packet();p['pending']=[{'id':'test1','status':'needs_team_handoff','authorized':True,'available':True}]
         self.assertEqual(next_action(p)['action'],'team_handoff');self.assertFalse(gate(p,'closeout')['passed'])

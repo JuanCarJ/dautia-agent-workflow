@@ -592,6 +592,8 @@ def gate(packet: dict, stage: str = "preflight") -> dict:
                 issues.append("handoff_missing_or_stale:" + child["id"])
             required_target = child.get("required_agent_type")
             if required_target:
+                if required_target in ("worker", "code_explorer") or "__" not in str(required_target):
+                    issues.append("delegation_agent_type_role_qualified_required:" + child["id"])
                 if child.get("agent_type") != required_target:
                     issues.append("delegation_agent_type_mismatch:" + child["id"])
                 if child.get("fork_turns") != "none":
