@@ -48,6 +48,56 @@ class SupportError(ValueError):
     """Safe public reason code. Never put raw payloads or credentials in it."""
 
 
+# Stage projections keep optional decision support contextual. They are deliberately
+# smaller than a packet and never carry transcripts, prompts or private credentials.
+STAGE_FIELDS = {
+    'brief': ('objective_id', 'project_id', 'outcome', 'work', 'requirements'),
+    'impact': ('objective_id', 'project_id', 'outcome', 'work', 'requirements', 'impacts', 'sources'),
+    'continuity': ('objective_id', 'project_id', 'outcome', 'candidate', 'spec_changes', 'decisions', 'authority', 'control'),
+    'route': ('objective_id', 'project_id', 'outcome', 'work', 'requirements', 'runtime', 'authority', 'control'),
+    'context': ('objective_id', 'project_id', 'outcome', 'work', 'requirements', 'optional_context', 'sources', 'skills'),
+    'progress': ('objective_id', 'project_id', 'outcome', 'work', 'candidate', 'pending', 'delegations', 'findings', 'control'),
+    'closeout': ('objective_id', 'project_id', 'outcome', 'completion_claim', 'work', 'candidate', 'requirements', 'test_expectations', 'checks', 'review', 'delegations', 'pending'),
+    'action': ('objective_id', 'project_id', 'outcome', 'work', 'authority', 'proposed_action', 'external', 'release', 'recovery'),
+}
+STAGE_REQUIRED = {
+    'brief': ('objective_id', 'project_id', 'work'),
+    'impact': ('objective_id', 'project_id', 'work', 'requirements'),
+    'continuity': ('objective_id', 'project_id', 'candidate', 'authority'),
+    'route': ('objective_id', 'project_id', 'work', 'runtime'),
+    'context': ('objective_id', 'project_id', 'work'),
+    'progress': ('objective_id', 'project_id', 'work', 'candidate'),
+    'closeout': ('objective_id', 'project_id', 'candidate', 'requirements', 'checks', 'review'),
+    'action': ('objective_id', 'project_id', 'work', 'authority'),
+}
+
+RECORD_FIELDS = {
+    'requirements': ('id', 'text', 'expected', 'required', 'allowed_evidence', 'provider_required', 'physical_required', 'oracle_required'),
+    'impacts': ('id', 'treatment', 'rationale', 'blocking', 'check_ids', 'evidence'),
+    'sources': ('id', 'kind', 'expected_hash', 'observed_hash'),
+    'skills': ('id', 'kind', 'required', 'expected_hash', 'loaded_hash'),
+    'spec_changes': ('id', 'classification', 'base_hash', 'delta', 'approval'),
+    'optional_context': ('id', 'kind', 'summary', 'group_id', 'recoverable', 'negative_evidence', 'pinned'),
+    'pending': ('id', 'required', 'status', 'authorized', 'available', 'monitor_confirmed'),
+    'delegations': ('id', 'required', 'state', 'candidate_hash', 'evidence'),
+    'findings': ('id', 'kind', 'summary', 'resolved', 'evidence'),
+    'test_expectations': ('id', 'requirement_id', 'expected'),
+    'checks': ('id', 'requirement_id', 'status', 'candidate_hash', 'acceptance_hash', 'evidence_kind', 'evidence', 'provider_live', 'physical_device', 'fail_before', 'prior_failed', 'failure_resolution'),
+}
+SENSITIVE_KEY = re.compile(r'(?i)(transcript|prompt|message|chat|private|secret|password|token|credential|cookie|raw|payload)')
+OBJECT_FIELDS = {
+    'work': ('mode', 'operation', 'role', 'material', 'analysis', 'bugfix', 'security_opt_in', 'product_change', 'external_required', 'decisions_resolved', 'execution_difficulty', 'required_capabilities', 'target', 'interface'),
+    'candidate': ('repositories', 'artifact_digest', 'config_digest', 'revision'),
+    'authority': ('source_kind', 'source_refs', 'project_id', 'target', 'operations', 'document_scope', 'artifact_scope'),
+    'control': ('state', 'budget_remaining', 'progress'),
+    'runtime': ('available_profiles', 'available_targets', 'harness'),
+    'review': ('required', 'status', 'candidate_hash', 'acceptance_hash', 'author_run', 'reviewer_run', 'unresolved_disagreement', 'evidence'),
+    'external': ('required', 'outcome', 'target'),
+    'release': ('authorized_candidate_hash', 'target'),
+    'proposed_action': ('kind', 'target', 'procedure', 'scope'),
+}
+
+
 def text(x: Any) -> bool:
     return isinstance(x, str) and bool(x.strip())
 
@@ -78,6 +128,50 @@ def config_dir() -> Path:
     if not base.is_absolute():
         raise SupportError('config_root_must_be_absolute')
     return base / 'dautia'
+
+
+def project_stage_input(stage: str, packet: dict) -> tuple[dict, list[str]]:
+    """Return the minimum allow-listed state for one optional Jev stage.
+
+    Missing stage inputs cause an abstention at that stage. They do not mutate the
+    packet, grant authority or block the native workflow from continuing independently.
+    """
+    validate_packet(packet)
+    if stage not in STAGES:
+        raise SupportError('unknown_stage')
+    state = {}
+    for key in STAGE_FIELDS[stage]:
+        if key not in packet:
+            continue
+        value = packet[key]
+        if key in RECORD_FIELDS and isinstance(value, list):
+            state[key] = [_project_record(key, item) for item in value if isinstance(item, dict)]
+        elif key in OBJECT_FIELDS and isinstance(value, dict):
+            state[key] = {name: _sanitize_value(value[name]) for name in OBJECT_FIELDS[key] if name in value}
+        elif key in ('objective_id', 'project_id', 'outcome', 'completion_claim', 'recovery'):
+            state[key] = _sanitize_value(value)
+    missing = [key for key in STAGE_REQUIRED[stage] if key not in packet]
+    return state, missing
+
+
+def _project_record(kind: str, item: dict) -> dict:
+    return {key: _sanitize_value(item[key]) for key in RECORD_FIELDS[kind] if key in item}
+
+
+def _sanitize_value(value: Any, depth: int = 0) -> Any:
+    """Bound nested contract data and omit fields that could carry raw/private text."""
+    if depth > 5:
+        return None
+    if isinstance(value, dict):
+        return {key: _sanitize_value(val, depth + 1) for key, val in value.items()
+                if isinstance(key, str) and not SENSITIVE_KEY.search(key) and len(key) <= 80}
+    if isinstance(value, list):
+        return [_sanitize_value(item, depth + 1) for item in value[:64]]
+    if isinstance(value, str):
+        return value[:2000]
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    return None
 
 
 def defaults() -> dict:
@@ -252,7 +346,8 @@ def build_request(stage: str, p: dict, cfg: dict) -> dict:
         return {'model': cfg['model'], 'state': {}, 'questions': {}}
     if stage in ('brief', 'impact'):
         for item in p.get('requirements' if stage == 'brief' else 'impacts', []):
-            questions[item['id']] = choice({'item': item, 'question': 'Is the item explicitly treated by the proposed plan, without contradiction?'}, {
+            kind = 'requirements' if stage == 'brief' else 'impacts'
+            questions[item['id']] = choice({'item': _project_record(kind, item), 'question': 'Is the item explicitly treated by the proposed plan, without contradiction?'}, {
                 'covered': 'Treatment is explicit and consistent.', 'missing': 'A relevant part has no treatment.',
                 'contradictory': 'Evidence or treatment conflicts with the requirement.', 'unknown': 'Evidence insufficient.'})
     elif stage == 'route':
@@ -268,7 +363,7 @@ def build_request(stage: str, p: dict, cfg: dict) -> dict:
         for c in p.get('optional_context', []):
             if c.get('pinned') or c.get('negative_evidence') or c.get('recoverable') is not True:
                 continue
-            questions[c['id']] = choice({'candidate': c, 'question': 'Is this optional recoverable context relevant to the bounded work?'}, {'needed':'Relevant to goal or constraint.', 'irrelevant':'Clearly unrelated.', 'unknown':'May still matter.'})
+            questions[c['id']] = choice({'candidate': _project_record('optional_context', c), 'question': 'Is this optional recoverable context relevant to the bounded work?'}, {'needed':'Relevant to goal or constraint.', 'irrelevant':'Clearly unrelated.', 'unknown':'May still matter.'})
     else:
         prompts = {
             'continuity': ('Compare the proposed clarification with approved decisions. Classification is not approval.', {'consistent':'Consistent refinement.', 'conflict':'Replaces or conflicts with an approved decision.', 'proposal':'Alternative not established as approved.', 'unknown':'Insufficient context.'}),
@@ -279,14 +374,15 @@ def build_request(stage: str, p: dict, cfg: dict) -> dict:
         questions[stage] = choice(question, criteria)
     if len(questions) > cfg['max_questions']:
         raise SupportError('question_budget_exceeded_split_explicitly')
-    # Only this selected, explicitly authorized envelope leaves the host.
-    fields = ('outcome', 'work', 'requirements', 'test_expectations', 'impacts', 'analysis_brief', 'decisions',
-              'findings', 'pending', 'checks', 'completion_claim', 'proposed_action', 'new_message')
-    state = {k: p[k] for k in fields if k in p}
+    # Only the stage-specific, explicitly authorized envelope leaves the host.
+    state, missing = project_stage_input(stage, p)
     if stage == 'route':
         state['routing_kind'] = selection.get('routing_kind')
         state['eligible_profiles'] = selection.get('candidates', [])
     request = {'model': cfg['model'], 'state': state, 'questions': questions}
+    if missing:
+        request['state'] = {'abstention': 'stage_context_incomplete', 'missing': missing}
+        request['questions'] = {}
     if len(dumps(request)) > cfg['max_request_bytes']:
         raise SupportError('request_budget_exceeded_split_explicitly')
     return request
@@ -352,8 +448,17 @@ def evaluate(stage: str, packet: dict, cfg: dict, root: Path, *, allow_network: 
             return result
         if cfg['mode'] == 'off' or not allow_network or not cfg['features'][stage]:
             return result
+        # Inspect the source packet before projecting its stage envelope. A
+        # secret in an ignored/unknown field must still prevent any call.
+        if SECRET.search(dumps(packet).decode()):
+            raise SupportError('possible_secret_in_packet')
         request = build_request(stage, packet, cfg)
         result['question_hash'] = fingerprint(request['questions'])
+        if request.get('state', {}).get('abstention'):
+            result['status'] = 'abstain'
+            result['reason'] = request['state']['abstention']
+            result['missing_stage_inputs'] = request['state'].get('missing', [])
+            return result
         if not request['questions']:
             result['status'] = 'not_needed'; return result
         sharing = packet.get('data_sharing', {})
@@ -471,6 +576,10 @@ def main(argv: list[str] | None = None) -> int:
                     p = {'schema_version': 3, 'objective_id': 'synthetic-probe', 'project_id': 'synthetic',
                          'work': {'mode': 'DISCOVERY', 'role': 'principal', 'operation': 'read', 'material': True},
                          'outcome': 'Classify a synthetic alternative.', 'new_message': 'Consider a blue button.',
+                         'context_complete': True, 'coherence_evidence': ['synthetic-probe-contract'],
+                         'requirements': [{'id': 'probe-r1', 'text': 'Classify the supplied synthetic alternative.', 'expected': {'classification': 'typed'}, 'allowed_evidence': ['tool_result']}],
+                         'candidate': {'revision': 'synthetic-probe-v1'},
+                         'authority': {'source_kind': 'user', 'source_refs': ['explicit-synthetic-probe'], 'project_id': 'synthetic', 'target': 'none', 'operations': ['read']},
                          'data_sharing': {'approved': True, 'authority_ref': 'explicit-synthetic-probe'}}
                     cfg = copy.deepcopy(cfg); cfg['mode'] = 'shadow'; cfg['features']['continuity'] = True
                     stage = 'continuity'

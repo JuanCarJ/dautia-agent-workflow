@@ -16,6 +16,7 @@ from typing import Callable
 from workflow_core import (ContractError, READ_ROLES, canonical, fingerprint, gate,
                            policy, profile_selection, routing_arguments)
 from workflow_store import emit, safe_path
+from workflow_delivery import mark_started, reserve_dispatch
 
 
 def prepare_dispatch(packet: dict, decision: dict, agents_dir: Path) -> dict:
@@ -82,7 +83,8 @@ def prepare_dispatch(packet: dict, decision: dict, agents_dir: Path) -> dict:
 
 
 def dispatch_prepared(packet: dict, decision: dict, prepared: dict, agents_dir: Path,
-                      spawn: Callable[[dict], dict], *, events_root: Path | None = None) -> dict:
+                      spawn: Callable[[dict], dict], *, events_root: Path | None = None,
+                      ledger_root: Path | None = None) -> dict:
     """Consumer for an existing, authorized host's native spawn callable.
 
     The host maps agent_type/message to its actual tool schema. A failure after
@@ -94,6 +96,20 @@ def dispatch_prepared(packet: dict, decision: dict, prepared: dict, agents_dir: 
     current = prepare_dispatch(packet, decision, agents_dir)
     if current['plan_hash'] != prepared.get('plan_hash'):
         raise ContractError('dispatch_plan_changed')
+    reservation = None
+    if ledger_root is not None:
+        reservation = reserve_dispatch(
+            ledger_root, objective_id=packet['objective_id'], project_id=packet['project_id'],
+            block_id=str(packet.get('work', {}).get('block_id', 'root-block')),
+            attempt=str(packet.get('work', {}).get('attempt', 'attempt-1')),
+            profile=current['profile_id'], candidate_hash=fingerprint(packet.get('candidate', {})),
+            packet_hash=current['context_hash'], dispatch_key=current['plan_hash'])
+        if reservation['status'] == 'reconcile_required':
+            return dict(current, status='dispatch_outcome_unknown', dispatch_performed=None,
+                        reason='reconcile_before_retry', reservation=reservation)
+        if reservation['status'] == 'reused':
+            return dict(current, status='dispatch_already_reserved', dispatch_performed=False,
+                        reason='identical_dispatch_reused', reservation=reservation)
     event = {'objective_id': packet['objective_id'], 'project_id': packet['project_id'],
              'profile_requested': current['profile_id'], 'profile_configured': current['profile_id'],
              'context_hash': current['context_hash'], 'policy_hash': current['policy_hash'],
@@ -117,7 +133,14 @@ def dispatch_prepared(packet: dict, decision: dict, prepared: dict, agents_dir: 
     child = returned.get('agent_id') or returned.get('thread_id') or returned.get('id')
     if not isinstance(child, str) or not child:
         return dict(current, status='dispatch_outcome_unknown', dispatch_performed=None,
-                    reason='native_child_identity_missing')
+                        reason='native_child_identity_missing')
+    if ledger_root is not None:
+        try:
+            mark_started(ledger_root, reservation['dispatch']['dispatch_id'], child)
+        except Exception:
+            return dict(current, status='dispatch_outcome_unknown', dispatch_performed=True,
+                        child_reference=child, reason='dispatch_ledger_write_unknown',
+                        delivery_received=False)
     model, effort = returned.get('model'), returned.get('model_reasoning_effort')
     mismatch = (model is not None and model != current['model_requested'] or
                 effort is not None and effort != current['effort_requested'])
