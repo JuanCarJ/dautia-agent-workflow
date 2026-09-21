@@ -102,6 +102,14 @@ class CoreTests(unittest.TestCase):
         }
         self.assertNotIn('project_context_incomplete', gate(p, 'closeout')['issues'])
 
+    def test_missing_active_workstream_blocks_product_closeout(self):
+        p = packet('write_product', 'implementer', 'IMPLEMENTATION')
+        p['project_context'] = {
+            'project_id':'proj1', 'documentation_status':'complete',
+            'active_workstream':'missing', 'workstreams':[],
+        }
+        self.assertIn('project_context_incomplete', gate(p, 'closeout')['issues'])
+
     def test_contract_test_conflict_before_write(self):
         p=packet('write_product','implementer','IMPLEMENTATION'); p['test_expectations'][0]['expected']['camera_changed']=True
         self.assertIn('contract_test_conflict:T1',gate(p)['issues'])

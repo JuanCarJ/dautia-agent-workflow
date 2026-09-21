@@ -402,7 +402,7 @@ def gate(packet: dict, stage: str = "preflight") -> dict:
         if packet.get("context_complete") is not True:
             (warns if operation == "read" else issues).append("context_incomplete")
         if (stage in ("closeout", "release") and operation in ("write_product", "write_tests", "git_write", "external_mutation")
-                and "context_incomplete" in warns):
+                and ({"context_incomplete", "context_active_workstream_missing"} & set(warns))):
             issues.append("project_context_incomplete")
         for source in packet.get("sources", []):
             if source.get("expected_hash") != source.get("observed_hash") or not nonempty(source.get("observed_hash")):
