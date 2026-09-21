@@ -5,10 +5,10 @@ un candidato de piloto: controles ejecutables y pruebas locales no equivalen a
 validación real de modelos, Desktop, dispositivos o proveedores.
 
 Sol 5.6 high permanece en el principal. El implementador definido usa medium;
-la ejecución técnicamente exigente usa high. Jev puede evaluar medium/high y
-análisis Sol/Astra sin autorizar acciones. Las skills conservan sus criterios.
+la ejecución técnicamente exigente usa high. Astra se reserva para análisis
+justificado y nunca autoriza acciones. Las skills conservan sus criterios.
 [Routing r3.2](skills/dautia-project-cycle/references/model-routing.md) describe
-selección, destinos generados y verificación del despacho; no activa Jev.
+selección determinista, destinos generados y verificación del despacho.
 No se incorpora un fork de FirstMate ni un supervisor adicional.
 
 ## Fuentes y generación
@@ -49,17 +49,6 @@ con respaldo. Nunca borra archivos ajenos. No modifica sesiones ni activa hooks.
 
 Guía: [setup y piloto](docs/r3-setup.md). Modelo/capacidades reales y hooks necesitan
 smoke en cada host. Cursor hereda su selector: no se anuncia paridad de routing.
-
-## Jev
-
-```sh
-dautia-jev setup --mode shadow --store-key
-dautia-jev doctor
-dautia-jev probe --allow-network
-```
-
-Sin setup queda off; la clave nunca va en Git/chat/argumentos. Probe envía contenido
-sintético y consume API. La precisión/umbrales requieren evaluación propia.
 
 ## Multirepo y auditorías
 

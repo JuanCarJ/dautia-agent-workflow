@@ -1,0 +1,178 @@
+#!/usr/bin/env python3
+"""Local dispatch ledger for delivery reconciliation.
+
+The ledger records opaque hashes and state transitions only.  It never retries a
+native child and never treats a late or stale response as a valid delivery.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import fcntl
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Any
+
+from workflow_core import ContractError, IDENTIFIER, canonical
+from workflow_store import atomic_write, private_dir, read_private, safe_path
+
+
+def _check(value: Any, label: str) -> str:
+    if not isinstance(value, str) or not IDENTIFIER.fullmatch(value):
+        raise ContractError("invalid_" + label)
+    return value
+
+
+def _hash(value: Any, label: str) -> str:
+    if not isinstance(value, str) or len(value) != 64 or any(c not in "0123456789abcdef" for c in value.lower()):
+        raise ContractError("invalid_" + label)
+    return value.lower()
+
+
+def _objective_state(value: str) -> str:
+    if not isinstance(value, str):
+        raise ContractError('invalid_objective_state')
+    normalized = value.strip().upper()
+    if normalized not in ('RUNNING', 'PAUSED', 'CANCELLED', 'FAILED', 'INTERRUPTED', 'COMPLETE', 'BLOCKED'):
+        raise ContractError('invalid_objective_state')
+    return normalized
+
+
+def _path(root: Path) -> Path:
+    if not root.is_absolute():
+        raise ContractError("ledger_root_must_be_absolute")
+    private_dir(root)
+    path = root / "dispatch-ledger.json"
+    safe_path(path)
+    return path
+
+
+def _load(root: Path) -> dict:
+    path = _path(root)
+    if not path.exists():
+        return {"schema_version": 1, "dispatches": []}
+    return json.loads(read_private(path, 2_000_000))
+
+
+def _save(root: Path, value: dict) -> None:
+    atomic_write(_path(root), canonical(value))
+
+
+@contextmanager
+def _ledger_lock(root: Path):
+    """Serialize local read-modify-write transitions on one host."""
+    if not root.is_absolute():
+        raise ContractError("ledger_root_must_be_absolute")
+    private_dir(root)
+    lock_path = root / "dispatch-ledger.lock"
+    safe_path(lock_path)
+    fd = os.open(lock_path, os.O_CREAT | os.O_RDWR | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    try:
+        os.fchmod(fd, 0o600)
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        finally:
+            os.close(fd)
+
+
+def reserve_dispatch(root: Path, *, objective_id: str, project_id: str, block_id: str,
+                     attempt: str, profile: str, candidate_hash: str, packet_hash: str,
+                     dispatch_key: str) -> dict:
+    for value, label in ((objective_id, "objective_id"), (project_id, "project_id"),
+                         (block_id, "block_id"), (attempt, "attempt"), (profile, "profile")):
+        _check(value, label)
+    candidate_hash, packet_hash, dispatch_key = (_hash(candidate_hash, "candidate_hash"),
+                                                _hash(packet_hash, "packet_hash"),
+                                                _hash(dispatch_key, "dispatch_key"))
+    with _ledger_lock(root):
+        data = _load(root)
+        for item in data["dispatches"]:
+            if item.get("dispatch_key") != dispatch_key:
+                continue
+            if item.get("candidate_hash") != candidate_hash or item.get("packet_hash") != packet_hash:
+                return {"status": "reconcile_required", "reason": "dispatch_key_payload_changed", "dispatch": item}
+            if item.get("state") in ("reserved", "started", "delivered"):
+                return {"status": "reused", "reason": "identical_dispatch", "dispatch": item}
+            return {"status": "reconcile_required", "reason": "dispatch_state_unknown", "dispatch": item}
+        dispatch_id = "d-" + hashlib.sha256((dispatch_key + objective_id).encode()).hexdigest()[:24]
+        item = {"dispatch_id": dispatch_id, "objective_id": objective_id, "project_id": project_id,
+                "block_id": block_id, "attempt": attempt, "profile": profile,
+                "candidate_hash": candidate_hash, "packet_hash": packet_hash,
+                "dispatch_key": dispatch_key, "state": "reserved", "child_reference_hash": None,
+                "delivery_hash": None, "delivery": None}
+        data["dispatches"].append(item)
+        _save(root, data)
+        return {"status": "reserved", "dispatch": item}
+
+
+def _find(data: dict, dispatch_id: str) -> dict:
+    _check(dispatch_id, "dispatch_id")
+    for item in data["dispatches"]:
+        if item.get("dispatch_id") == dispatch_id:
+            return item
+    raise ContractError("dispatch_not_found")
+
+
+def mark_started(root: Path, dispatch_id: str, child_reference: str) -> dict:
+    with _ledger_lock(root):
+        data = _load(root); item = _find(data, dispatch_id); _check(child_reference, "child_reference")
+        child_hash = hashlib.sha256(child_reference.encode()).hexdigest()
+        if item["state"] == "started":
+            if item.get("child_reference_hash") == child_hash:
+                return {"status": "already_started", "dispatch": item}
+            return {"status": "reconcile_required", "reason": "child_identity_changed", "dispatch": item}
+        if item["state"] != "reserved":
+            raise ContractError("dispatch_not_startable")
+        item["state"] = "started"
+        item["child_reference_hash"] = child_hash
+        _save(root, data)
+        return {"status": "started", "dispatch": item}
+
+
+def record_delivery(root: Path, dispatch_id: str, *, candidate_hash: str, packet_hash: str,
+                    delivery: dict, objective_state: str) -> dict:
+    objective_state = _objective_state(objective_state)
+    with _ledger_lock(root):
+        data = _load(root); item = _find(data, dispatch_id)
+        if item["state"] == "stale":
+            return {"status": "stale", "reason": "stale_dispatch_is_terminal", "dispatch": item}
+        candidate_hash, packet_hash = _hash(candidate_hash, "candidate_hash"), _hash(packet_hash, "packet_hash")
+        if candidate_hash != item["candidate_hash"] or packet_hash != item["packet_hash"]:
+            item["state"] = "stale"; _save(root, data)
+            return {"status": "stale", "reason": "candidate_or_packet_changed", "dispatch": item}
+        if objective_state != "RUNNING":
+            return {"status": "late_ignored", "reason": "objective_not_running", "dispatch": item}
+        if item["state"] == "delivered":
+            return {"status": "already_delivered", "reason": "delivery_already_recorded", "dispatch": item}
+        if item["state"] != "started":
+            return {"status": "delivery_before_start", "reason": "dispatch_not_started", "dispatch": item}
+        if not isinstance(delivery, dict):
+            raise ContractError("delivery_must_be_object")
+        if not isinstance(delivery.get('status'), str) or not delivery['status']:
+            raise ContractError('delivery_status_required')
+        for field in ('checks', 'pending'):
+            if field in delivery and (not isinstance(delivery[field], list) or len(delivery[field]) > 100):
+                raise ContractError('invalid_delivery_' + field)
+        item["state"] = "delivered"; item["delivery_hash"] = hashlib.sha256(canonical(delivery)).hexdigest()
+        item["delivery"] = {k: delivery[k] for k in ("status", "evidence", "summary", "candidate_hash", "checks", "pending") if k in delivery}
+        _save(root, data)
+        return {"status": "delivered", "dispatch": item}
+
+
+def continuation(root: Path, dispatch_id: str, *, objective_state: str = "RUNNING",
+                 budget_remaining: bool = True) -> dict:
+    objective_state = _objective_state(objective_state)
+    data = _load(root); item = _find(data, dispatch_id)
+    if objective_state != "RUNNING" or not budget_remaining:
+        return {"action": "stop", "reason": "objective_control_or_budget", "dispatch": item}
+    if item["state"] in ("stale",):
+        return {"action": "reconcile", "reason": "stale_delivery", "dispatch": item}
+    if item["state"] in ("reserved",):
+        return {"action": "wait", "reason": "dispatch_not_started", "dispatch": item}
+    if item["state"] in ("started",):
+        return {"action": "reconcile", "reason": "delivery_not_observed", "dispatch": item}
+    return {"action": "continue", "reason": "delivery_recorded", "dispatch": item}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "project_id": "scratch-app",
+  "documentation_status": "scratch",
+  "repositories": [],
+  "components": [],
+  "environments": [],
+  "providers": [],
+  "canonical_sources": {},
+  "notes": "La documentación se construye durante discovery; los desconocidos permanecen explícitos."
+}

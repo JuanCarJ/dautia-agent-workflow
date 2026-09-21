@@ -41,8 +41,13 @@ def frontmatter(text: str) -> tuple[dict, str]:
                 raise ContractError("unsupported_quoted_frontmatter") from exc
         elif val.startswith("'") and val.endswith("'"):
             value = val[1:-1].replace("''", "'")
-        elif val.startswith(("!", "&", "*", "[", "{")):
-            # Nested metadata is left to its actual YAML consumer. Never eval it.
+        elif val.startswith(("[", "{")):
+            try:
+                value = json.loads(val)
+            except ValueError:
+                # Nested metadata is left to its actual YAML consumer. Never eval it.
+                value = None
+        elif val.startswith(("!", "&", "*")):
             value = None
         else:
             value = val
@@ -74,10 +79,14 @@ def inventory(roots: list[Path], max_skills: int = 500) -> dict:
                 description = fields.get("description")
                 if not isinstance(name, str) or not isinstance(description, str) or not description or description == "---":
                     raise ContractError("skill_metadata_incomplete")
-                entries.append({"name": name, "description": description,
-                                "source_root": root_index, "relative_path": skill.name + "/SKILL.md",
-                                "sha256": hashlib.sha256(data).hexdigest(), "state": "discoverable",
-                                "loaded": None, "used": None})
+                entry = {"name": name, "description": description,
+                         "source_root": root_index, "relative_path": skill.name + "/SKILL.md",
+                         "sha256": hashlib.sha256(data).hexdigest(), "state": "discoverable",
+                         "loaded": None, "used": None}
+                for key in ('origin', 'version', 'triggers', 'exclusions', 'tools', 'permissions', 'outputs'):
+                    if key in fields and fields[key] is not None:
+                        entry[key] = fields[key]
+                entries.append(entry)
             except (ContractError, UnicodeError):
                 warnings.append("invalid_skill_metadata")
     names = [x["name"] for x in entries]

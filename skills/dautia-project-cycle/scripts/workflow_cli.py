@@ -11,7 +11,7 @@ import shlex
 import sqlite3
 import sys
 from typing import Any
-from workflow_core import ContractError, gate, load_json, validate_packet, profile_selection, canonical, fingerprint, routing_arguments
+from workflow_core import ContractError, gate, load_json, validate_packet, profile_selection, canonical, fingerprint, routing_arguments, policy
 from workflow_store import state_root, atomic_write, read_private, bind, binding, resource_lease, emit, export_events
 from workspace_audit import snapshot, reconcile
 from skill_catalog import inventory
@@ -132,7 +132,7 @@ def main(argv: list[str] | None = None) -> int:
     b = sub.add_parser('bind'); b.add_argument('packet', type=Path); b.add_argument('--session', required=True); b.add_argument('--generation', required=True); b.add_argument('--cwd', required=True, type=Path)
     sub.add_parser('hook')
     r = sub.add_parser('route'); r.add_argument('packet', type=Path)
-    d = sub.add_parser('dispatch-plan'); d.add_argument('packet', type=Path); d.add_argument('--agents-dir', type=Path, required=True); d.add_argument('--cwd', type=Path, required=True); d.add_argument('--allow-network', action='store_true')
+    d = sub.add_parser('dispatch-plan'); d.add_argument('packet', type=Path); d.add_argument('--agents-dir', type=Path, required=True); d.add_argument('--cwd', type=Path, required=True)
     s = sub.add_parser('snapshot'); s.add_argument('--repo', type=Path, required=True); s.add_argument('--repo-id', required=True); s.add_argument('--checkout-id', required=True)
     rec = sub.add_parser('reconcile'); rec.add_argument('before', type=Path); rec.add_argument('after', type=Path); rec.add_argument('--owned', nargs='*', default=[])
     c = sub.add_parser('catalog'); c.add_argument('roots', nargs='+', type=Path)
@@ -140,6 +140,11 @@ def main(argv: list[str] | None = None) -> int:
     l = sub.add_parser('lease'); l.add_argument('resource'); l.add_argument('--owner', required=True); l.add_argument('--generation', required=True); l.add_argument('--release', action='store_true')
     e = sub.add_parser('event'); e.add_argument('file', type=Path); e.add_argument('--emitter', default='workflow')
     ex = sub.add_parser('export'); ex.add_argument('objective'); ex.add_argument('--legacy-snapshot', type=Path)
+    qa = sub.add_parser('qa-prepare'); qa.add_argument('evidence_root', type=Path); qa.add_argument('--product-root', type=Path)
+    qw = sub.add_parser('qa-write'); qw.add_argument('evidence_root', type=Path); qw.add_argument('relative_path'); qw.add_argument('input', type=Path)
+    dl = sub.add_parser('delivery'); dl.add_argument('dispatch_id'); dl.add_argument('delivery', type=Path); dl.add_argument('--candidate-hash', required=True); dl.add_argument('--packet-hash', required=True); dl.add_argument('--objective-state', required=True)
+    dc = sub.add_parser('dispatch-continue'); dc.add_argument('dispatch_id'); dc.add_argument('--objective-state', required=True); dc.add_argument('--no-budget', action='store_true')
+    rp = sub.add_parser('objective-report'); rp.add_argument('--limit', type=int, default=30)
     sub.add_parser('doctor')
     args = ap.parse_args(argv); root = args.state_root or state_root(); code = 0
     try:
@@ -160,12 +165,22 @@ def main(argv: list[str] | None = None) -> int:
             result = profile_selection(**routing_arguments(p))
             code = 0 if result['status'] == 'selected' else 3
         elif args.command == 'dispatch-plan':
-            from jev_support import evaluate, load_config, config_dir
             from workflow_dispatch import prepare_dispatch
             packet = refresh_sources(validate_packet(read_input(args.packet)), args.cwd)
-            cfg_root = config_dir()
-            decision = evaluate('route', packet, load_config(cfg_root), cfg_root,
-                                allow_network=args.allow_network, events_root=root)
+            selection = profile_selection(**routing_arguments(packet))
+            selected = selection.get('selected')
+            decision = {
+                'schema_version': 1,
+                'stage': 'route',
+                'status': 'selected' if selection.get('status') == 'selected' else 'blocked',
+                'selection': selection,
+                'dispatch_target': (packet['work']['role'] + '__' + selected) if selected else None,
+                'context_hash': fingerprint(packet),
+                'policy_hash': fingerprint(policy()),
+                'dispatch_blocked_reason': selection.get('reason') if not selected else None,
+                'network_called': False,
+                'authorizes_action': False,
+            }
             result = prepare_dispatch(packet, decision, args.agents_dir)
         elif args.command == 'hook':
             raw = sys.stdin.buffer.read(256_001)
@@ -185,6 +200,24 @@ def main(argv: list[str] | None = None) -> int:
                 load_json(data)
                 result['legacy_snapshot_sha256'] = hashlib.sha256(data).hexdigest()
                 result['legacy_snapshot_included'] = False
+        elif args.command == 'qa-prepare':
+            from qa_artifacts import prepare_workspace
+            result = prepare_workspace(root, args.evidence_root, args.product_root)
+        elif args.command == 'qa-write':
+            from qa_artifacts import write_evidence
+            result = write_evidence(args.evidence_root, args.relative_path, args.input.read_bytes())
+        elif args.command == 'delivery':
+            from workflow_delivery import record_delivery
+            result = record_delivery(root, args.dispatch_id, candidate_hash=args.candidate_hash,
+                                     packet_hash=args.packet_hash, delivery=read_input(args.delivery),
+                                     objective_state=args.objective_state)
+        elif args.command == 'dispatch-continue':
+            from workflow_delivery import continuation
+            result = continuation(root, args.dispatch_id, objective_state=args.objective_state,
+                                  budget_remaining=not args.no_budget)
+        elif args.command == 'objective-report':
+            from workflow_report import report
+            result = report(root, args.limit)
         else:
             result = {'contract_version':15,'storage_exists':root.exists(),'network_called':False,
                       'hook_coverage':'bound_root_objectives_supported_tools_only','native_runtime_tested':False,

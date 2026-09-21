@@ -14,6 +14,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from evidence_contract import validate_evidence, validate_project_context
+
 IDENTIFIER = re.compile(r"^[A-Za-z0-9_.:-]{1,120}$")
 OPERATIONS = {"read", "capture_docs", "write_artifact", "write_product", "write_tests", "git_write", "external_mutation"}
 MODES = {"DISCOVERY", "AUDIT", "IMPLEMENTATION", "RELEASE"}
@@ -62,7 +64,7 @@ def records(obj: dict, field: str) -> list[dict]:
     value = obj.get(field, [])
     if not isinstance(value, list) or any(not isinstance(v, dict) for v in value):
         raise ContractError("invalid_list_" + field)
-    ids = [v.get("id") for v in value]
+    ids = [v.get("evidence_id", v.get("id")) if field == "evidence" else v.get("id") for v in value]
     if any(not isinstance(v, str) or not IDENTIFIER.fullmatch(v) for v in ids) or len(set(ids)) != len(ids):
         raise ContractError("invalid_ids_" + field)
     return value
@@ -97,7 +99,7 @@ def role_profiles(role: str, rules: dict | None = None) -> list[str]:
 
 
 def routing_arguments(packet: dict) -> dict:
-    """Shared inputs for local selection, Jev and dispatch; do not drop host limits."""
+    """Shared inputs for local selection and dispatch; do not drop host limits."""
     w, rt = packet["work"], packet.get("runtime", {})
     return dict(role=w["role"], operation=w["operation"], analysis=w.get("analysis", False),
                 available=rt.get("available_profiles"), denied=rt.get("denied_profiles"),
@@ -122,7 +124,7 @@ def profile_selection(role: str, operation: str, *, analysis: bool,
 
     Prepared implementation can use medium/high. Missing or open decisions need
     preparation, not extra model effort. Difficulty unknown uses high as fallback
-    but permits Jev to assess medium/high. Explicit overrides do not bypass this.
+    but requires the principal to choose among eligible profiles with evidence. Explicit overrides do not bypass this.
     """
     rules = rules or policy()
     if role not in READ_ROLES | WRITE_ROLES or operation not in OPERATIONS:
@@ -162,6 +164,9 @@ def profile_selection(role: str, operation: str, *, analysis: bool,
             return blocked("override_source_required")
         if rules["profiles"][requested]["family"] == "astra" and not analytic:
             return blocked("astra_not_execution_candidate")
+        if (rules["profiles"][requested]["family"] == "astra"
+                and rules["profiles"][requested].get("effort") not in ("low", "medium")):
+            return blocked("profile_above_astra_ceiling")
         candidates.append(requested)
     candidates = [p for p in dict.fromkeys(candidates) if p not in (denied or [])]
     if available is not None:
@@ -212,9 +217,9 @@ def validate_packet(packet: Any) -> dict:
     for flag in ("material", "analysis", "bugfix", "security_opt_in", "prior_effect_unknown", "product_change", "external_required", "target_verified", "host_key_verified", "decisions_resolved"):
         if flag in work and type(work[flag]) is not bool:
             raise ContractError("invalid_boolean_" + flag)
-    for field in ("requirements", "test_expectations", "impacts", "sources", "skills", "checks", "pending", "delegations", "spec_changes", "findings", "workspaces"):
+    for field in ("requirements", "test_expectations", "impacts", "sources", "skills", "checks", "evidence", "pending", "delegations", "spec_changes", "findings", "workspaces"):
         records(packet, field)
-    for field in ("authority", "control", "review", "candidate", "diagnostic", "external", "release", "runtime", "data_sharing"):
+    for field in ("authority", "control", "review", "candidate", "diagnostic", "external", "release", "runtime", "data_sharing", "project_context"):
         if field in packet and not isinstance(packet[field], dict):
             raise ContractError("invalid_object_" + field)
     if "required_capabilities" in work and (not isinstance(work["required_capabilities"], list) or any(not nonempty(x) for x in work["required_capabilities"])):
@@ -293,6 +298,61 @@ def gate(packet: dict, stage: str = "preflight") -> dict:
     operation, mode, role = w["operation"], w["mode"], w["role"]
     issues: list[str] = []
     warns: list[str] = []
+    component_evidence = packet.get("component_evidence")
+    required_components = packet.get("required_components", [])
+    if "evidence" in packet:
+        for record in packet.get("evidence", []):
+            checked = validate_evidence(record)
+            if not checked["valid"]:
+                issues.extend("invalid_evidence:" + x for x in checked["errors"])
+            else:
+                warns.extend(checked["warnings"])
+                normalized = checked["record"]
+                if normalized["objective_id"] != packet["objective_id"] or normalized["project_id"] != packet["project_id"]:
+                    issues.append("evidence_project_or_objective_mismatch:" + normalized["evidence_id"])
+    if "project_context" in packet:
+        context = validate_project_context(packet["project_context"])
+        if not context["valid"]:
+            issues.extend("invalid_project_context:" + x for x in context["errors"])
+        else:
+            warns.extend(context["warnings"])
+            if context["context"]["project_id"] != packet["project_id"]:
+                issues.append("project_context_project_mismatch")
+    if stage in ("closeout", "release") and required_components and component_evidence is None:
+        issues.extend("required_component_evidence_missing:" + str(x) for x in required_components)
+    if component_evidence is not None:
+        if not isinstance(component_evidence, list):
+            issues.append("component_evidence_must_be_list")
+        else:
+            seen_components = set()
+            for component in component_evidence:
+                if not isinstance(component, dict) or not isinstance(component.get("component"), str) or not component["component"]:
+                    issues.append("invalid_component_evidence"); continue
+                name = component["component"]
+                if name in seen_components: issues.append("duplicate_component_evidence:" + name)
+                seen_components.add(name)
+                if not isinstance(component.get("repository"), str) or not component.get("repository") or not re.fullmatch(r"[0-9a-fA-F]{7,64}", str(component.get("candidate_sha", ""))):
+                    issues.append("component_candidate_sha_required:" + name)
+                if component.get("status") not in ("independent", "dependent", "blocked"):
+                    issues.append("invalid_component_status:" + name)
+                if not isinstance(component.get("checks", []), list) or not all(isinstance(x, str) and x for x in component.get("checks", [])):
+                    issues.append("invalid_component_checks:" + name)
+                if not isinstance(component.get("depends_on", []), list) or not all(isinstance(x, str) and x for x in component.get("depends_on", [])):
+                    issues.append("invalid_component_dependencies:" + name)
+            missing_components = sorted(set(required_components) - seen_components) if isinstance(required_components, list) else []
+            issues.extend("required_component_evidence_missing:" + x for x in missing_components)
+            if "contract_changed" in packet.get("shared_contracts", []):
+                for component in component_evidence:
+                    if isinstance(component, dict) and component.get("status") == "dependent" and not component.get("depends_on"):
+                        issues.append("shared_contract_dependency_missing:" + component["component"])
+            if stage in ("closeout", "release"):
+                for component in component_evidence:
+                    if not isinstance(component, dict) or component.get("component") not in required_components:
+                        continue
+                    if component.get("status") == "blocked":
+                        issues.append("required_component_blocked:" + component["component"])
+                    if not component.get("checks"):
+                        issues.append("required_component_checks_missing:" + component["component"])
     material = w.get("material", True) or operation in ("write_product", "write_tests", "git_write", "external_mutation")
     mutating = operation not in ("read",)
     authority = packet.get("authority", {})
@@ -340,7 +400,10 @@ def gate(packet: dict, stage: str = "preflight") -> dict:
         if not refs(packet.get("coherence_evidence")):
             issues.append("coherence_review_required")
         if packet.get("context_complete") is not True:
-            issues.append("context_incomplete")
+            (warns if operation == "read" else issues).append("context_incomplete")
+        if (stage in ("closeout", "release") and operation in ("write_product", "write_tests", "git_write", "external_mutation")
+                and ({"context_incomplete", "context_active_workstream_missing"} & set(warns))):
+            issues.append("project_context_incomplete")
         for source in packet.get("sources", []):
             if source.get("expected_hash") != source.get("observed_hash") or not nonempty(source.get("observed_hash")):
                 issues.append("stale_source:" + source["id"])

@@ -1,88 +1,60 @@
 # Execution profiles · routing r3.2
 
-Canonical policy: `../config/routing-policy.json`. The principal remains
-`gpt-5.6-sol/high`. The configured `implementer` default is `gpt-5.6-sol/medium`;
-other canonical defaults are unchanged by this correction. A default is not a
-quality benchmark or a universal requirement imposed by the adapter generator.
-Skills and role methods retain the same authority, procedures and acceptance.
+La política canónica está en `../config/routing-policy.json`. El principal permanece
+`gpt-5.6-sol/high`. El implementador usa `gpt-5.6-sol/medium` únicamente cuando el
+bloque está definido, las decisiones están resueltas y la ejecución es rutinaria.
+La ejecución exigente o desconocida usa Sol high.
 
-## Prepared implementation versus analysis
+## Preparación e implementación
 
-For `implementer`, `implementer_complex` and `systems_implementer` writing product
-or tests, supply `work.decisions_resolved: true` from the actual bounded handoff.
-False or absent readiness returns a preparation block, not an effort escalation.
-Also characterize `work.execution_difficulty` as `routine`, `demanding` or `unknown`:
+Para `implementer`, `implementer_complex` y `systems_implementer` que escriben
+producto o tests, el handoff debe declarar `work.decisions_resolved: true` y
+`work.execution_difficulty` como `routine`, `demanding` o `unknown`.
 
-- Routine, defined implementation can use Sol medium or high. The implementer
-  baseline is medium. Jev can recommend high when the supplied task warrants it.
-- Demanding execution uses high without an automatic downgrade. An explicit user
-  profile exception still requires a usable target and never overrides authority.
-- Unknown difficulty uses high as fallback while Jev may assess medium/high. It
-  does not imply unresolved product decisions can be delegated to a writer.
+- La ejecución rutinaria y definida puede usar Sol medium.
+- La ejecución demanding usa Sol high sin downgrade automático.
+- La dificultad unknown usa Sol high como fallback.
+- Decisiones de producto o arquitectura abiertas vuelven a análisis; no se resuelven
+  aumentando el esfuerzo del escritor.
 
-Jev's `route` questions distinguish available information, open decisions,
-execution/analysis depth and contradictions. Implementation recommendations are
-medium/high only. If new product/architecture decisions or conflicts appear,
-return the analysis to the principal; do not convert the writer to Astra.
-Missing tools, credentials or evidence are not deficiencies of model intelligence.
+## Análisis y Astra
 
-Analytical roles can use Sol high, Astra low or Astra medium. Astra never writes
-product or performs external operations under this policy. A substantive analytical
-question can merit Astra from the outset, not only after failures. No routing by
-role name, file count, brand or sensitivity alone. The mapping remains uncalibrated.
+Los roles analíticos pueden usar Sol high, Astra low o Astra medium cuando el
+principal aporta evidencia y el alcance justifica el coste. Astra nunca escribe
+producto ni ejecuta operaciones externas bajo esta política. No se elige por nombre
+del rol, número de archivos, marca o sensibilidad.
 
-## Default, principal selection and user exception
+`runtime.principal_choice` permite seleccionar un perfil ordinario elegible con
+referencias de evidencia. No es una aprobación, no cambia la autoridad y no prueba
+que el host haya cargado el modelo.
 
-`runtime.principal_choice = {"profile": "astra_medium", "evidence_refs": ["..."]}`
-allows the principal to select an ordinary eligible profile with evidence, including
-when Jev is off or shadow. This is not a user approval and grants no permissions.
-Explicit-only profiles such as Sol xhigh and Astra high require the separate
-`runtime.explicit_override` bound to a user directive. Availability, denied profiles,
-capabilities and budget are checked before any external routing call. Missing
-availability remains unverified; no fabricated fallback profile is run.
+Perfiles explicit-only, como Sol xhigh, requieren un override explícito del usuario
+ligado a sus referencias. El techo de Astra es medium. La disponibilidad observada,
+los perfiles denegados, capacidades y presupuesto se validan antes del dispatch.
+Nunca se hace un downgrade silencioso ni se inventa un perfil disponible.
 
-Off uses the differentiated baseline or a permitted explicit selection. Shadow
-observes but does not apply Jev's recommendation or add a semantic blocker.
-Selective applies `route` only when that feature is enabled and local gates pass.
-Low confidence/API failure preserves the baseline. A selective missing-information
-or open-decision result returns preparation rather than another speculative patch.
-No setup, network permission or live mode is enabled by this code change.
+## Generación y dispatch
 
-## Generate, prepare, dispatch, observe
-
-The generator validates each host's configured role default against eligible
-profiles instead of requiring all roles to be high. It derives a canonical name
-and qualified `ROLE__PROFILE` definitions from one role body. Profiles excluded
-from a role are not generated; no Astra writer definitions exist. These are
-configuration variants, not additional running agents or a new supervisor.
-
-For a material worker use the installed launcher:
+El generador valida los defaults de cada host y crea nombres cualificados
+`ROLE__PROFILE`. Las variantes de Astra solo se generan para roles analíticos. Una
+variante es configuración, no un agente ejecutándose ni un supervisor adicional.
 
 ```sh
 dautia-workflow dispatch-plan PACKET --agents-dir CODEX_HOME/agents --cwd WORKSPACE
-# Add --allow-network only with the existing Jev and data-sharing authority.
 ```
 
-Use real paths. The packet's `runtime.available_targets` must describe names
-actually loaded in the host, not only files found on disk. The command checks the
-packet, chooses the profile, binds the decision to context/policy, and reads the
-exact generated TOML to verify name, model, effort and sandbox. It returns a
-prepared `agent_type`. The principal must invoke that exact native worker with
-the same bounded handoff, not the canonical role or a different effort argument.
-Regenerate/reload profiles before using new names. Parent config can otherwise
-change native permissions; the local check is not proof of runtime enforcement.
+El comando valida el packet, selecciona el perfil local, enlaza la decisión al
+contexto y política, y comprueba el TOML exacto. El principal debe invocar ese
+`agent_type` con el mismo handoff. El callback nativo debe registrar el perfil
+reportado; un archivo generado no prueba runtime efectivo.
 
-`workflow_dispatch.dispatch_prepared` is the callable consumer for a supported
-host's spawn API. It revalidates the plan before making one callback and separates
-requested/configured/reported values, child start and delivery. Unknown spawn
-outcomes require reconciliation, never an automatic retry. No provider report is
-inferred from a configured model. A returned mismatch remains a mismatch.
+`workflow_dispatch.dispatch_prepared` consume una sola vez el callback del host,
+separa perfil solicitado/configurado/reportado y exige reconciliación ante un
+resultado incierto. No reintenta automáticamente y no usa red ni otro proveedor.
 
-The standalone CLI cannot call a tool in its parent Codex thread. The native
-principal/tool binding still requires a host smoke; a JSON plan does not prove a
-spawn. No shell proxy, private socket, unconditional spawn hook or new agent runtime
-is introduced. Cursor continues to inherit its model selector; no parity claim.
+## Evaluación
 
-Independent review and acceptance remain unchanged. Evaluate the policy using
-comparable tasks and total accepted-objective effort, not unit-test counts or
-Astra's opinion as ground truth. Historical r3.1 evidence stays historical.
+La calidad se evalúa con tareas comparables, esfuerzo total aceptado, regresiones,
+tiempo, intervención humana y resultado real. Los conteos de tests o una opinión
+de un modelo no son ground truth. Las skills aportan método; esta política decide
+el perfil y no modifica autoridad ni aceptación.

@@ -79,7 +79,7 @@ def payloads(repo: Path, home: Path, profile_name: str, scope: str='workflow', c
         elif 'cursor' in profile['harnesses']:result[str(home/'.cursor/agents'/filename)]=(data,0o600)
     if 'cursor' in profile['harnesses']:
         result[str(home/'.cursor/rules/dautia-workflow.mdc')]=(b'---\nalwaysApply: true\n---\n'+(repo/'AGENTS.md').read_bytes(),0o600)
-    launchers={'dautia-workflow':skill_root/'dautia-project-cycle/scripts/workflow_cli.py','dautia-jev':skill_root/'dautia-project-cycle/scripts/jev_support.py'}
+    launchers={'dautia-workflow':skill_root/'dautia-project-cycle/scripts/workflow_cli.py'}
     if scope!='routing':launchers['dautia-supabase']=skill_root/'dautia-ci-cd/scripts/dautia_supabase.py'
     for name,entry in launchers.items():
         text='#!/bin/sh\nset -eu\nexec '+shlex.quote(sys.executable)+' '+shlex.quote(str(entry))+' "$@"\n'
