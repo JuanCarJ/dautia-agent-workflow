@@ -1,8 +1,8 @@
-# Implementación del plan r3 — candidato 15.0.0-rc1
+# Implementación del rollback r3 — candidato 15.0.0-stable-core
 
-Base inspeccionada: 720248e39c01093b76037de2ed9edfaae551f8c0. Cambios de workflow,
-no de SideQuest, otros productos o hosts. No hay prueba con modelos reales, API
-Jev, SSH, despliegues o Codex Desktop en esta implementación local.
+Base estable: 84b22b2bc395694e2d05cd567da59c6919885f7a. Cambios de workflow,
+no de SideQuest, otros productos o hosts. No hay prueba con modelos reales, SSH,
+despliegues o Codex Desktop en esta implementación local.
 
 ## Componentes implementados
 
@@ -13,10 +13,9 @@ Jev, SSH, despliegues o Codex Desktop en esta implementación local.
 - workflow_cli/store: frontera explícita, vínculo de raíz, adaptador de hooks
   acotado, leases cooperativos por recurso/generación, eventos de metadatos y export
   deduplicado. Sin supervisor nuevo ni permisos remotos implícitos.
-- jev_support: cliente HTTP directo, preguntas Choice para ocho fronteras, setup,
-  privacidad, presupuesto, caché e invalidación. Off por defecto, shadow reversible,
-  aplicación selectiva requiere capacidad/destino verificados. El selector no crea
-  trabajadores: entrega el destino que el principal debe invocar y correlacionar.
+- routing determinista: la política versionada selecciona el perfil por rol,
+  operación, decisiones resueltas, dificultad y disponibilidad observada. No hay
+  proveedor asesor en el camino de dispatch ni autorización implícita.
 - workspace_audit: snapshot/reconciliación de lectura, estado propio/ajeno, sin
   git clean/reset/stash/add. No declara descartable ningún worktree.
 - audit_ingest: valida estructura e integridad de ZIP futuros sin extraer/ejecutar.
@@ -52,8 +51,8 @@ verificar cobertura, confianza y permisos en el host.
 La auditoría Git local aún no llegó: su ingesta está disponible, su recuperación
 puntual no se ha decidido ni ejecutado. También faltan revisión independiente del
 candidato, integración del PR, piloto App/CLI y permisos QA, medición real Sol/Astra,
-probe autenticado de Jev, calibración/activación selectiva e instalación en el Mac/WSL.
-El catálogo de 52 escenarios es una aceptación de plan, no 52 agentes ejecutados.
+piloto nativo, calibración de perfiles e instalación en el Mac/WSL.
+El catálogo histórico de 52 escenarios conserva el plan original y está marcado como superseded; no son 52 agentes ejecutados ni criterios vigentes de este rollback.
 `conformance/r3/implementation-status.json` separa esas fronteras por cambio.
 
 ## Verificación local del candidato
@@ -73,10 +72,10 @@ fixtures.
 
 ## Estado de publicación antes del PR
 
-El overlay está aplicado en la rama aislada `feat/r3-integrated`, basada en el
+El overlay está aplicado en la rama aislada `rollback/stable-core-no-jev`, basada en el
 baseline exacto, y queda listo para commit y revisión independiente. Todavía no se
 ha abierto el PR ni se ha fusionado `main`; la instalación real en el host, el smoke
 del launcher y cualquier piloto nativo se mantienen deliberadamente pendientes hasta
-obtener el SHA integrado. Jev sigue `off` y los hooks permanecen como candidato sin
+obtener el SHA integrado. El routing externo permanece desactivado y los hooks permanecen como candidato sin
 confianza. El paquete ZIP original y el backup del aplicador se conservan fuera del
 checkout.

@@ -17,7 +17,6 @@ from workflow_cli import hook, refresh_sources
 from workflow_store import bind, binding, emit, export_events, resource_lease, atomic_write
 from workspace_audit import parse_status, snapshot, reconcile
 from skill_catalog import frontmatter, inventory
-import jev_support as jev
 
 
 def packet(operation='read', role='systems_analyst', mode='AUDIT'):
@@ -39,15 +38,6 @@ def packet(operation='read', role='systems_analyst', mode='AUDIT'):
     return p
 
 
-def response(request, labels=None, confidence=.99):
-    labels=labels or {}
-    answers={}
-    for key,q in request['questions'].items():
-        selected=labels.get(key,next(iter(q['criteria'])))
-        answers[key]={'type':'choice','choice':selected,'confidence':confidence,
-                      'probabilities':{c:1.0 if c==selected else 0.0 for c in q['criteria']}}
-    return {'model':request['model'],'answers':answers}
-
 
 class CoreTests(unittest.TestCase):
     def test_approved_consistent_packet(self):
@@ -61,6 +51,54 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(result['passed']); self.assertIn('context_incomplete', result['warnings'])
         write = packet('write_product', 'implementer', 'IMPLEMENTATION'); write['context_complete'] = False
         self.assertIn('context_incomplete', gate(write)['issues'])
+
+    def test_evidence_contract_is_checked_by_gate_but_scratch_warns(self):
+        p = packet(); p['project_context'] = {'project_id':'proj1','documentation_status':'scratch'}
+        result = gate(p)
+        self.assertTrue(result['passed']); self.assertIn('context_incomplete', result['warnings'])
+        p['evidence'] = [{'id':'bad','status':'observed'}]
+        self.assertTrue(any(x.startswith('invalid_evidence:') for x in gate(p)['issues']))
+
+    def test_scratch_context_blocks_product_closeout_but_not_discovery(self):
+        p = packet('write_product', 'implementer', 'IMPLEMENTATION')
+        p['project_context'] = {'project_id':'proj1','documentation_status':'scratch'}
+        self.assertIn('project_context_incomplete', gate(p, 'closeout')['issues'])
+        self.assertTrue(gate(p)['passed'])
+
+    def test_evidence_and_context_must_match_packet_identity(self):
+        p = packet()
+        p['project_context'] = {'project_id':'other','documentation_status':'complete'}
+        self.assertIn('project_context_project_mismatch', gate(p)['issues'])
+        p['project_context'] = {'project_id':'proj1','documentation_status':'complete'}
+        p['evidence'] = [{'evidence_id':'e1','objective_id':'other','project_id':'proj1','stage':'audit',
+                          'source_kind':'test','source_ref':'test-1','observed_at':'unknown',
+                          'observation':'fixture','status':'observed','strength':'E2'}]
+        self.assertIn('evidence_project_or_objective_mismatch:e1', gate(p)['issues'])
+
+    def test_evidence_id_is_canonical_packet_key(self):
+        p = packet()
+        p['evidence'] = [{'evidence_id':'e1','objective_id':'obj1','project_id':'proj1','stage':'audit',
+                          'source_kind':'test','source_ref':'test-1','observed_at':'unknown',
+                          'observation':'fixture','status':'observed','strength':'E2'}]
+        self.assertTrue(gate(p)['passed'])
+
+    def test_complete_active_workstream_can_close_with_partial_project_docs(self):
+        p = packet('write_product', 'implementer', 'IMPLEMENTATION')
+        p['project_context'] = {
+            'project_id':'proj1', 'documentation_status':'partial',
+            'active_workstream':'functional',
+            'workstreams':[{'id':'functional','documentation_status':'complete'},
+                           {'id':'demo','documentation_status':'scratch'}],
+        }
+        self.assertNotIn('project_context_incomplete', gate(p, 'closeout')['issues'])
+
+    def test_missing_active_workstream_blocks_product_closeout(self):
+        p = packet('write_product', 'implementer', 'IMPLEMENTATION')
+        p['project_context'] = {
+            'project_id':'proj1', 'documentation_status':'complete',
+            'active_workstream':'missing', 'workstreams':[],
+        }
+        self.assertIn('project_context_incomplete', gate(p, 'closeout')['issues'])
 
     def test_contract_test_conflict_before_write(self):
         p=packet('write_product','implementer','IMPLEMENTATION'); p['test_expectations'][0]['expected']['camera_changed']=True
@@ -115,7 +153,7 @@ class CoreTests(unittest.TestCase):
         p=packet();p['impacts']=[{'id':'i1','treatment':'no_change_justified'}]
         self.assertIn('unjustified_no_change:i1',gate(p)['issues'])
 
-    def test_regression_activates_diagnosis_without_jev(self):
+    def test_regression_activates_diagnosis_without_external_advisor(self):
         p=packet('write_product','implementer','IMPLEMENTATION');p['findings']=[{'id':'f1','kind':'regression','resolved':False}]
         self.assertEqual(next_action(p)['action'],'diagnose');self.assertFalse(gate(p)['passed'])
 
@@ -226,92 +264,6 @@ class RoutingTests(unittest.TestCase):
     def test_runtime_truth_unknown(self):
         result=profile_selection('implementer','write_product',analysis=False)
         self.assertIsNone(result['provider_observed']);self.assertFalse(result['changes_parent'])
-
-
-class JevTests(unittest.TestCase):
-    def setUp(self):
-        self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup);self.root=Path(self.temp.name)/'cfg';self.events=Path(self.temp.name)/'events'
-        self.cfg=jev.defaults();self.cfg['mode']='shadow';self.cfg['cache_ttl_seconds']=0
-        self.env=patch.dict(os.environ,{'TYPESAFE_API_KEY':'synthetic-test-only'});self.env.start();self.addCleanup(self.env.stop)
-
-    def test_off_no_transport(self):
-        self.cfg['mode']='off';transport=Mock();r=jev.evaluate('route',packet(),self.cfg,self.root,allow_network=True,transport=transport)
-        transport.assert_not_called();self.assertFalse(r['network_called'])
-
-    def test_network_explicit(self):
-        transport=Mock();jev.evaluate('route',packet(),self.cfg,self.root,transport=transport);transport.assert_not_called()
-
-    def test_unprepared_writer_requires_readiness_before_route_call(self):
-        transport=Mock();r=jev.evaluate('route',packet('write_product','implementer','IMPLEMENTATION'),self.cfg,self.root,allow_network=True,transport=transport)
-        transport.assert_not_called();self.assertEqual(r['selection']['reason'],'implementation_readiness_required');self.assertIsNone(r['selection']['selected'])
-
-    def test_complex_analysis_shadow_then_selective(self):
-        labels={'information':'sufficient','decisions':'coupled','depth':'deep','contradictions':'multiple'}
-        transport=lambda req,*_:response(req,labels)
-        r=jev.evaluate('route',packet(),self.cfg,self.root,allow_network=True,transport=transport)
-        self.assertEqual(r['recommended_profile'],'astra_medium');self.assertEqual(r['selection']['selected'],'sol_high')
-        self.cfg['mode']='selective';self.cfg['apply_features']=['route']
-        r=jev.evaluate('route',packet(),self.cfg,self.root,allow_network=True,transport=transport)
-        self.assertEqual(r['dispatch_target'],'systems_analyst__astra_medium');self.assertFalse(r['dispatch_performed'])
-
-    def test_focal_routine_does_not_force_astra(self):
-        labels={'information':'sufficient','decisions':'focal','depth':'routine','contradictions':'none'}
-        r=jev.evaluate('route',packet(),self.cfg,self.root,allow_network=True,transport=lambda req,*_:response(req,labels))
-        self.assertEqual(r['recommended_profile'],'sol_high')
-
-    def test_missing_evidence_not_more_intelligence(self):
-        labels={'information':'retrieve','decisions':'coupled','depth':'deep','contradictions':'multiple'}
-        r=jev.evaluate('route',packet(),self.cfg,self.root,allow_network=True,transport=lambda req,*_:response(req,labels))
-        self.assertIsNone(r['recommended_profile'])
-
-    def test_confidence_abstention(self):
-        r=jev.evaluate('brief',packet(),self.cfg,self.root,allow_network=True,transport=lambda req,*_:response(req,confidence=.1))
-        self.assertEqual(r['status'],'abstain')
-
-    def test_bad_model_or_invalid_type_fallback(self):
-        for raw in ({'model':'other','answers':{}},{'model':self.cfg['model'],'answers':{'R1':{'type':'noul'}}}):
-            with self.subTest(raw=raw):
-                r=jev.evaluate('brief',packet(),self.cfg,self.root,allow_network=True,transport=lambda *args:raw)
-                self.assertEqual(r['status'],'fallback');self.assertFalse(r['certifies_completion'])
-
-    def test_no_secret_or_unapproved_state(self):
-        for p in (packet(),packet()):
-            if p==packet(): p['analysis_brief']='password=do-not-send-this-value'
-            transport=Mock();r=jev.evaluate('brief',p,self.cfg,self.root,allow_network=True,transport=transport)
-            transport.assert_not_called();self.assertEqual(r['status'],'fallback')
-        p=packet();p['data_sharing']['approved']=False;transport=Mock()
-        jev.evaluate('brief',p,self.cfg,self.root,allow_network=True,transport=transport);transport.assert_not_called()
-
-    def test_budget_store_enforces_cap(self):
-        self.cfg['max_requests_per_objective_per_day']=1
-        r=jev.evaluate('brief',packet(),self.cfg,self.root,allow_network=True,transport=lambda req,*_:response(req))
-        self.assertTrue(r['network_called']);transport=Mock()
-        r=jev.evaluate('brief',packet(),self.cfg,self.root,allow_network=True,transport=transport)
-        self.assertEqual(r['reason'],'request_quota_exhausted');transport.assert_not_called()
-
-    def test_cache_bound_to_objective_and_state(self):
-        self.cfg['cache_ttl_seconds']=300;transport=Mock(side_effect=lambda req,*_:response(req));p=packet()
-        jev.evaluate('brief',p,self.cfg,self.root,allow_network=True,transport=transport)
-        r=jev.evaluate('brief',p,self.cfg,self.root,allow_network=True,transport=transport)
-        self.assertTrue(r['cache_hit']);self.assertEqual(transport.call_count,1)
-        p['objective_id']='obj2';jev.evaluate('brief',p,self.cfg,self.root,allow_network=True,transport=transport)
-        self.assertEqual(transport.call_count,2)
-        p['outcome']='new';jev.evaluate('brief',p,self.cfg,self.root,allow_network=True,transport=transport)
-        self.assertEqual(transport.call_count,3)
-
-    def test_context_preserves_core_and_negative(self):
-        self.cfg['mode']='selective';self.cfg['apply_features']=['context'];p=packet()
-        p['optional_context']=[{'id':'pin','pinned':True},{'id':'neg','negative_evidence':True},{'id':'drop','recoverable':True}]
-        r=jev.evaluate('context',p,self.cfg,self.root,allow_network=True,transport=lambda req,*_:response(req,{'drop':'irrelevant'}))
-        self.assertEqual(r['selected_context_ids'],['pin','neg']);self.assertIn('requirements',p)
-
-    def test_each_stage_uses_valid_typed_request(self):
-        p=packet();p['impacts']=[{'id':'i1','treatment':'indirect_validation','check_ids':['C1']}]
-        p['optional_context']=[{'id':'c1','recoverable':True,'text':'optional'}]
-        for stage in jev.STAGES:
-            with self.subTest(stage=stage):
-                req=jev.build_request(stage,p,self.cfg);self.assertTrue(req['questions'])
-                self.assertEqual(set(jev.parse_response(response(req),req)),set(req['questions']))
 
 
 class StoreAndHookTests(unittest.TestCase):

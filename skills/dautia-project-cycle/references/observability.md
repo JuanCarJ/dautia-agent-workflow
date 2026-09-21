@@ -23,8 +23,7 @@ Events include context bound/invalidated, skills selected/load observed, route
 evaluated, dispatch requested, agent started/ended, handoff received, validation,
 review, scope/spec change, continuation, blocked/reopened and workspace reconciliation.
 The schema allowlists small metadata and rejects arbitrary prompts, paths, commands
-and tool outputs. The Jev client can record actual typed choices/probabilities and
-recommendation vs selected profile. Dispatch performed remains false until the real
+and tool outputs. Dispatch performed remains false until the real
 harness supplies an observation; no role name or client result invents an agent.
 
 Storage is private JSONL per objective/emitter under XDG_STATE_HOME/dautia (default
@@ -44,8 +43,7 @@ Evaluate acceptance, omitted requirements, escaped regressions, late impacts,
 necessary vs avoidable user intervention, use of analytical results and own new
 workspace residue. Every rate needs a denominator, cohort, source and unknowns.
 Model comparison uses equivalent prior context/candidates and an independent rubric;
-Astra is not ground truth. Compare improved workflow without Jev, shadow and selective
-use, preserving withheld cases. Never repeat real business mutations to benchmark.
+Astra is not ground truth. Compare workflow variants only with comparable cohorts, preserving withheld cases. Never repeat real business mutations to benchmark.
 
 Metrics cannot prove comprehension. Semantic audit needs the authorized original
 focal packet/evidence; hashes alone cannot reconstruct it. Keep that private sample
@@ -57,7 +55,6 @@ never an invented heartbeat. Closeout separates product, integration, external
 outcome and workspace disposition. Backups are under
 XDG_CONFIG_HOME/dautia/workflow-backups, matching the installer.
 
-El CLI registra automáticamente metadatos de bind/gate/hooks y las evaluaciones
-de Jev; no lee transcripciones completas. DAUTIA_TELEMETRY=off desactiva ese
-registro sin conceder permisos ni cambiar los criterios. evaluate --no-record
-permite omitir su evento; las brechas de cobertura no se contabilizan como ceros.
+El CLI registra automáticamente metadatos de bind/gate/hooks y routing local; no lee
+transcripciones completas. DAUTIA_TELEMETRY=off desactiva ese registro sin conceder
+permisos ni cambiar los criterios. Las brechas de cobertura no se contabilizan como ceros.

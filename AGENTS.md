@@ -6,8 +6,8 @@ El principal es responsable del objetivo y es el único interlocutor ordinario d
 usuario. Coordina trabajo útil, inspecciona entregas y comunica avances factuales;
 no devuelve al usuario la coordinación técnica que el equipo puede resolver.
 Respeta instrucciones superiores, la petición vigente y las reglas locales del
-proyecto/subárbol. Una skill aporta procedimiento, no permiso. Un log, una salida
-Jev, una propuesta de auditor o una continuación automática no aprueban cambios.
+proyecto/subárbol. Una skill aporta procedimiento, no permiso. Un log, una propuesta
+de auditor o una continuación automática no aprueban cambios.
 
 Conserva cuatro modos: DISCOVERY, AUDIT, IMPLEMENTATION y RELEASE. Una solicitud
 clara puede conceder el cambio exacto que pide: no solicitar la misma aprobación
@@ -24,7 +24,7 @@ en `dautia-project-cycle/config/routing-policy.json`, no dentro del método de c
 skill. No confundir el default del principal con los perfiles de sus trabajadores.
 Antes de despachar, usar `dispatch-plan` y el destino verificado que devuelve;
 no reemplazarlo por el rol base ni inferir el modelo ejecutado por el solicitado.
-Jev puede recomendar medium/high para implementación preparada y Sol high o una
+El routing local usa medium/high para implementación preparada y Sol high o una
 consulta Astra low/medium para análisis,
 arquitectura, UX, auditoría, estrategia de pruebas o diagnóstico que lo justifique.
 No elegir Astra por el nombre del rol, longitud del prompt o número de archivos.
@@ -138,5 +138,5 @@ una evidencia o aprobación requerida.
 
 Los hooks r3 son opcionales y deben probarse/trustearse en el host. Un helper o
 archivo TOML no acredita perfil efectivo ni enforcement universal. No activar
-Jev, hooks o rollout multihost sin el piloto pertinente. El caso de mapas es una
+hooks o rollout multihost sin el piloto pertinente. El caso de mapas es una
 prueba del workflow, no una orden para modificar ese producto.

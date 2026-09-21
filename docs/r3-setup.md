@@ -55,34 +55,20 @@ python3 scripts/install.py --rollback /ruta/absoluta/al/respaldo/r3-...
 
 No revierte productos, archivos ajenos, operaciones externas ni estado de sesiones.
 
-## API key de Jev
+## Routing determinista
 
-Añadir ~/.local/bin al PATH del entorno que inicia Codex si no está presente.
-Elegir UNA de estas alternativas (la clave nunca se pega en la conversación):
+La política local selecciona el perfil antes del dispatch. El principal usa Sol high;
+un implementador solo usa Sol medium cuando las decisiones están resueltas y la
+ejecución es rutinaria. La ejecución exigente o desconocida usa Sol high. Astra
+low/medium queda limitada a análisis con evidencia del principal. Ninguna selección
+local constituye prueba de que el host cargó el modelo: el adaptador debe comprobar
+el archivo de definición y el perfil efectivo.
 
-```sh
-dautia-jev setup --mode shadow --store-key
-# O TYPESAFE_API_KEY inyectada desde tu gestor de secretos:
-# dautia-jev setup --mode shadow --from-env
-dautia-jev doctor
-# Consulta sintética real opcional, con coste de API:
-# dautia-jev probe --allow-network
-```
-
-El primer modo pide la clave sin eco y la guarda fuera de Git con permisos 0600;
-eso no equivale a cifrado. El segundo solo registra el uso del entorno. `doctor`
-no usa red. Sin setup el modo es `off`. Cada evaluación de datos necesita
-`data_sharing` con autorización y contenido mínimo; `--allow-network` no concede
-por sí solo permiso para transmitir cualquier archivo del proyecto.
-
-En shadow se registran recomendaciones, no se aplican rutas. `selective` requiere
-habilitar explícitamente apply_features y comprobar perfiles/destinos en el host.
-Los umbrales iniciales no están calibrados; no usarlos como aprobación de producto.
-El timeout del transporte es de operaciones de socket, no un SLA de pared para
-un servidor que envíe lentamente; el hook tiene su timeout independiente y nunca
-llama a Jev. La respuesta y petición están acotadas por tamaño, y las solicitudes
-por objetivo/día. Cache por objetivo, contexto, preguntas y política, no por texto
-sin procedencia. No hay retries automáticos infinitos ni debug de payloads.
+Una instalación previa puede conservar un launcher local de Jev o una personalización
+fuera del conjunto administrado. El rollback no lo borra automáticamente: primero se
+comprueba su origen y se conserva el respaldo; cualquier retirada explícita requiere
+autoridad separada y lectura posterior. Que exista ese comando heredado no lo vuelve
+parte del dispatch ni del camino crítico de esta versión.
 
 ## Hooks y límites efectivos
 
@@ -117,10 +103,10 @@ Verificar versión/descubrimiento de roles, perfil realmente aplicado (principal
 implementer medium o high según el encargo), retorno de un hijo,
 consulta analítica Astra sin escritura, rechazo de contradicción, pausa/reanudación,
 artefactos QA y preservación de cambios ajenos. La medición de modelos reportados
-queda unknown si el runtime no la expone. Solo después activar el piloto de datos
-mínimos; no activar automáticamente todos los puntos de Jev.
+queda unknown si el runtime no la expone. El routing local no activa proveedores
+externos ni llamadas de red.
 
-El CLI registra automáticamente metadatos de bind/gate/hooks y las evaluaciones
-de Jev; no lee transcripciones completas. DAUTIA_TELEMETRY=off desactiva ese
-registro sin conceder permisos ni cambiar los criterios. evaluate --no-record
-permite omitir su evento; las brechas de cobertura no se contabilizan como ceros.
+El CLI registra automáticamente metadatos mínimos de bind/gate/hooks y routing
+local; no lee transcripciones completas. DAUTIA_TELEMETRY=off desactiva ese
+registro sin conceder permisos ni cambiar los criterios. Las brechas de cobertura
+no se contabilizan como ceros.

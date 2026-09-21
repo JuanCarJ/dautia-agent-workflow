@@ -13,7 +13,7 @@ Use atomic requirements: id, text and structured expected invariant. A
 `test_expectations` entry identifies the requirement it tests and its expected
 value. The deterministic check detects opposing supplied expectations. It does
 not derive natural-language truth from arbitrary code; that inspection belongs
-to the principal/reviewer, assisted by Jev where valuable.
+to the principal/reviewer, with the selected local profile recorded separately.
 
 The context includes decisions, anti-scope, sources with expected/observed hashes,
 skills with observed load hashes, investigated impacts and exact pending questions.

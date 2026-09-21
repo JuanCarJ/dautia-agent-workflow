@@ -78,7 +78,7 @@ def prepare_dispatch(packet: dict, decision: dict, agents_dir: Path) -> dict:
               'policy_hash': fingerprint(policy()), 'decision_hash': fingerprint(decision),
               'dispatch_performed': False, 'model_reported': None, 'effort_reported': None,
               'native_enforcement_verified': False, 'authorizes_action': False}
-    # Runtime timings and Jev response metadata can vary between identical
+    # Runtime timings and external metadata can vary between identical
     # evaluations. They belong in the audit plan, not the idempotency key.
     result['dispatch_key'] = fingerprint({
         'objective_id': packet['objective_id'], 'project_id': packet['project_id'],

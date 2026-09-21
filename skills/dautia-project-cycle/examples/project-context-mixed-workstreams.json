@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "project_id": "madercore",
+  "documentation_status": "partial",
+  "active_workstream": "functional",
+  "workstreams": [
+    {
+      "id": "functional",
+      "documentation_status": "complete",
+      "notes": "Flujo funcional con contrato y runbook verificados."
+    },
+    {
+      "id": "demo",
+      "documentation_status": "scratch",
+      "notes": "Demo separada; no hereda evidencia del flujo funcional."
+    }
+  ],
+  "repositories": [
+    {"id": "madercore-app", "source": "workspace"}
+  ],
+  "environments": [
+    {"id": "staging", "provider": "supabase"}
+  ],
+  "canonical_sources": {
+    "spec": "docs/spec.md",
+    "runbook": "docs/runbook.md"
+  }
+}

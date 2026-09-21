@@ -41,6 +41,13 @@ report its precise boundary rather than bypassing it to make the check green.
 The checks compare supplied facts and refresh declared source files; they cannot
 prove semantic understanding, authentic human consent or provider truth.
 
+For projects with complete, partial or scratch documentation, use
+`references/evidence-contract.md` and `scripts/evidence_contract.py`. Evidence is
+bound to the current objective and project. An active workstream may scope the
+documentation status so a complete functional slice can close while a separate
+demo remains pending. Incomplete context may continue through discovery, but it
+blocks product closeout/release for that active scope.
+
 `bind PACKET --session SESSION --generation GENERATION --cwd WORKSPACE` preserves
 the packet for opt-in root hooks. Rebind at meaningful state changes; preserve
 pause and restart a generation only for a genuinely resumed/new run. Do not use
@@ -52,9 +59,9 @@ ID never grants the child the root's authority.
 Use `references/model-routing.md` and the versioned candidate policy. Ordinary
 execution remains on the configured default; complex open questions become bounded
 analysis with appropriate evidence, not a writer change or infinite retries.
-Jev setup/usage lives in `references/jev-support.md`. All eight checkpoints are
-optional and narrow; do not call them for every command. A negative observation,
-failed test or missing permission is relevant even when Jev is unavailable.
+Routing is local and deterministic; do not introduce a provider advisor into every
+command. A negative observation, failed test or missing permission is relevant and
+must remain visible in the packet and closeout evidence.
 
 For material delegation, prepare the actual worker packet and call
 `workflow_cli.py dispatch-plan PACKET --agents-dir CODEX_HOME/agents --cwd WORKSPACE`.
@@ -64,8 +71,9 @@ demanding or unknown; unresolved decisions return to analysis before writing.
 Use the returned exact `agent_type` in the native spawn and pass the same context.
 Do not substitute the canonical role or silently inherit the parent's effort.
 A prepared JSON request is not a spawned child: record its actual start/report and
-receive its delivery. The CLI does not intercept the native tool. Jev off/shadow
-still allows an evidence-backed principal choice among ordinary eligible profiles.
+receive its delivery. The CLI does not intercept the native tool. A principal choice
+among ordinary eligible profiles requires explicit evidence and remains separate from
+the configured default.
 
 Delegate only a useful bounded block. Retain one writer per workspace and one
 operator per simulator/browser/side-effectful resource. `workflow_cli.py lease`
