@@ -297,6 +297,15 @@ class CoreTests(unittest.TestCase):
             'model_observed':'gpt-6-astra','effort_observed':'medium'})
         self.assertIn('dispatch_astra_requires_analysis', gate(p, 'closeout')['issues'])
 
+    def test_dispatch_receipt_cannot_use_explicit_sol_profile_without_override(self):
+        p=packet('read', 'systems_analyst', 'AUDIT')
+        p['runtime'].update(dispatch_required=True, required_agent_type='systems_analyst__sol_xhigh',
+                            required_profile='sol_xhigh', dispatch_receipt={
+            'status':'completed','agent_type':'systems_analyst__sol_xhigh','fork_turns':'none',
+            'child_reference':'child1','evidence':['child-terminal-1'],
+            'model_observed':'gpt-5.6-sol','effort_observed':'xhigh'})
+        self.assertIn('dispatch_explicit_override_required', gate(p, 'closeout')['issues'])
+
     def test_team_preparation_before_user(self):
         p=packet();p['pending']=[{'id':'test1','status':'needs_team_handoff','authorized':True,'available':True}]
         self.assertEqual(next_action(p)['action'],'team_handoff');self.assertFalse(gate(p,'closeout')['passed'])

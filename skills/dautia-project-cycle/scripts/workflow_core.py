@@ -342,6 +342,11 @@ def dispatch_receipt_issues(packet: dict, stage: str) -> list[str]:
             and not (packet.get("work", {}).get("analysis") is True
                      and packet.get("work", {}).get("operation") in policy().get("analysis_operations", []))):
         issues.append("dispatch_astra_requires_analysis")
+    if expected.get("explicit_only"):
+        override = runtime.get("explicit_override")
+        if (not isinstance(override, dict) or override.get("profile") != expected_profile
+                or override.get("source_kind") != "user" or not refs(override.get("source_refs"))):
+            issues.append("dispatch_explicit_override_required")
     if receipt.get("model_observed") != expected.get("model"):
         issues.append("dispatch_reported_model_mismatch")
     if receipt.get("effort_observed") != expected.get("effort"):
