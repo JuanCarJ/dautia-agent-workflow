@@ -232,6 +232,26 @@ def normalize_project_context(context: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(values, list) or len(values) > MAX_LIST:
             raise EvidenceContractError(f"{field}_must_be_bounded_list")
         normalized[field] = [_context_entry(item, name=field) for item in values]
+    workstreams = context.get("workstreams", [])
+    if not isinstance(workstreams, list) or len(workstreams) > MAX_LIST:
+        raise EvidenceContractError("workstreams_must_be_bounded_list")
+    normalized["workstreams"] = []
+    for item in workstreams:
+        entry = _context_entry(item, name="workstreams")
+        if "id" not in entry:
+            raise EvidenceContractError("workstreams_id_required")
+        entry["id"] = _identifier(entry["id"], name="workstream_id", allow_unknown=False)
+        entry["documentation_status"] = _token(
+            entry.get("documentation_status", UNKNOWN),
+            name="workstream_documentation_status", allowed=DOC_STATUSES,
+        )
+        normalized["workstreams"].append(entry)
+    if len({item["id"] for item in normalized["workstreams"]}) != len(normalized["workstreams"]):
+        raise EvidenceContractError("duplicate_workstream_id")
+    if "active_workstream" in context:
+        normalized["active_workstream"] = _identifier(
+            context["active_workstream"], name="active_workstream", allow_unknown=False,
+        )
     canonical_sources = context.get("canonical_sources", {})
     if not isinstance(canonical_sources, dict) or len(canonical_sources) > MAX_METADATA_KEYS:
         raise EvidenceContractError("canonical_sources_must_be_bounded_object")
@@ -251,6 +271,13 @@ def validate_project_context(context: dict[str, Any]) -> dict[str, Any]:
         return {"valid": False, "errors": [str(exc)], "warnings": [], "context": None}
     warnings: list[str] = []
     status = normalized["documentation_status"]
+    active = normalized.get("active_workstream")
+    if active:
+        selected = next((item for item in normalized["workstreams"] if item["id"] == active), None)
+        if selected is None:
+            warnings.append("context_active_workstream_missing")
+        else:
+            status = selected["documentation_status"]
     if status in {"scratch", "partial", UNKNOWN, IN_PROGRESS}:
         warnings.append("context_incomplete")
     for field in ("repositories", "components", "environments"):

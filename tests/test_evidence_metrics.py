@@ -30,4 +30,12 @@ class EvidenceMetricsTests(unittest.TestCase):
         self.assertEqual(process.returncode, 0, process.stderr)
         self.assertEqual(json.loads(process.stdout)['cases'], 0)
 
+    def test_placeholder_labels_are_not_comparable(self):
+        result = metrics.summarize({'cases': [
+            {'gold_profile':'unknown','recommended_profile':'unknown'},
+        ]})
+        self.assertEqual(result['gold_labeled'], 0)
+        self.assertEqual(result['gold_compared'], 0)
+        self.assertEqual(result['recommendations'], 0)
+
 if __name__ == '__main__': unittest.main()

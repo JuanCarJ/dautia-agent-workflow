@@ -63,6 +63,9 @@ def evidence_readiness(packet: dict) -> list[str]:
             result = validate_evidence(record)
             if not result['valid']:
                 raise SupportError('invalid_evidence_contract')
+            normalized = result['record']
+            if normalized['objective_id'] != packet['objective_id'] or normalized['project_id'] != packet['project_id']:
+                raise SupportError('evidence_project_or_objective_mismatch')
             warnings.extend(result['warnings'])
     context = packet.get('project_context')
     if context is None:
@@ -71,6 +74,8 @@ def evidence_readiness(packet: dict) -> list[str]:
         result = validate_project_context(context)
         if not result['valid']:
             raise SupportError('invalid_project_context')
+        if result['context']['project_id'] != packet['project_id']:
+            raise SupportError('project_context_project_mismatch')
         warnings.extend(result['warnings'])
     return sorted(set(warnings))
 
@@ -127,7 +132,7 @@ OBJECT_FIELDS = {
     'external': ('required', 'outcome', 'target'),
     'release': ('authorized_candidate_hash', 'target'),
     'proposed_action': ('kind', 'target', 'procedure', 'scope'),
-    'project_context': ('project_id', 'documentation_status', 'repositories', 'environments', 'components', 'providers', 'risk_classes', 'canonical_sources', 'unknowns', 'notes'),
+'project_context': ('project_id', 'documentation_status', 'active_workstream', 'workstreams', 'repositories', 'environments', 'components', 'providers', 'risk_classes', 'canonical_sources', 'unknowns', 'notes'),
 }
 
 

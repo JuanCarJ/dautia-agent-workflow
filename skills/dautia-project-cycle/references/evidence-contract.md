@@ -111,6 +111,12 @@ que discovery los convierta en trabajo pendiente. No rechaza
 `documentation_status: "scratch"`, `"partial"`, `"unknown"` o
 `"in_progress"`.
 
+El manifiesto se interpreta para el alcance activo de la tarea. Si un proyecto
+tiene varios frentes, `active_workstream` identifica el registro correspondiente
+en `workstreams`; así una parte funcional documentada puede cerrarse mientras
+una demo separada conserva estado `scratch` o `in_progress`. Si no se declara
+un frente activo, se usa `documentation_status` del proyecto completo.
+
 El manifiesto no reemplaza reglas locales, contratos de API, runbooks,
 credenciales ni fuentes canónicas. Solo indica dónde buscar y qué fronteras
 pueden verse afectadas. Una ruta desconocida se conserva como `"unknown"` hasta

@@ -69,6 +69,39 @@ class CoreTests(unittest.TestCase):
         p['evidence'] = [{'id':'bad','status':'observed'}]
         self.assertTrue(any(x.startswith('invalid_evidence:') for x in gate(p)['issues']))
 
+    def test_scratch_context_blocks_product_closeout_but_not_discovery(self):
+        p = packet('write_product', 'implementer', 'IMPLEMENTATION')
+        p['project_context'] = {'project_id':'proj1','documentation_status':'scratch'}
+        self.assertIn('project_context_incomplete', gate(p, 'closeout')['issues'])
+        self.assertTrue(gate(p)['passed'])
+
+    def test_evidence_and_context_must_match_packet_identity(self):
+        p = packet()
+        p['project_context'] = {'project_id':'other','documentation_status':'complete'}
+        self.assertIn('project_context_project_mismatch', gate(p)['issues'])
+        p['project_context'] = {'project_id':'proj1','documentation_status':'complete'}
+        p['evidence'] = [{'evidence_id':'e1','objective_id':'other','project_id':'proj1','stage':'audit',
+                          'source_kind':'test','source_ref':'test-1','observed_at':'unknown',
+                          'observation':'fixture','status':'observed','strength':'E2'}]
+        self.assertIn('evidence_project_or_objective_mismatch:e1', gate(p)['issues'])
+
+    def test_evidence_id_is_canonical_packet_key(self):
+        p = packet()
+        p['evidence'] = [{'evidence_id':'e1','objective_id':'obj1','project_id':'proj1','stage':'audit',
+                          'source_kind':'test','source_ref':'test-1','observed_at':'unknown',
+                          'observation':'fixture','status':'observed','strength':'E2'}]
+        self.assertTrue(gate(p)['passed'])
+
+    def test_complete_active_workstream_can_close_with_partial_project_docs(self):
+        p = packet('write_product', 'implementer', 'IMPLEMENTATION')
+        p['project_context'] = {
+            'project_id':'proj1', 'documentation_status':'partial',
+            'active_workstream':'functional',
+            'workstreams':[{'id':'functional','documentation_status':'complete'},
+                           {'id':'demo','documentation_status':'scratch'}],
+        }
+        self.assertNotIn('project_context_incomplete', gate(p, 'closeout')['issues'])
+
     def test_contract_test_conflict_before_write(self):
         p=packet('write_product','implementer','IMPLEMENTATION'); p['test_expectations'][0]['expected']['camera_changed']=True
         self.assertIn('contract_test_conflict:T1',gate(p)['issues'])

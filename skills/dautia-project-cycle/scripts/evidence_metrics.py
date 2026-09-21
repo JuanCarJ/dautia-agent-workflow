@@ -25,6 +25,13 @@ def _read(path: str) -> dict[str, Any]:
     return value
 
 
+def _known_label(value: Any) -> bool:
+    """Return true only for an explicit, non-placeholder corpus label."""
+    return isinstance(value, str) and bool(value.strip()) and value.strip().lower() not in {
+        "unknown", "in_progress", "pending", "none", "null",
+    }
+
+
 def summarize(corpus: dict[str, Any]) -> dict[str, Any]:
     rows = [row for row in corpus["cases"] if isinstance(row, dict)]
     states: dict[str, int] = {}
@@ -32,8 +39,8 @@ def summarize(corpus: dict[str, Any]) -> dict[str, Any]:
         state = row.get("status")
         key = state if isinstance(state, str) and state else "unknown"
         states[key] = states.get(key, 0) + 1
-    labeled = [row for row in rows if isinstance(row.get("gold_profile"), str)]
-    compared = [row for row in labeled if isinstance(row.get("recommended_profile"), str)]
+    labeled = [row for row in rows if _known_label(row.get("gold_profile"))]
+    compared = [row for row in labeled if _known_label(row.get("recommended_profile"))]
     durations = [float(row["duration_ms"]) for row in rows
                  if isinstance(row.get("duration_ms"), (int, float))
                  and math.isfinite(float(row["duration_ms"])) and float(row["duration_ms"]) >= 0]
@@ -44,7 +51,7 @@ def summarize(corpus: dict[str, Any]) -> dict[str, Any]:
         "cases": len(rows),
         "states": states,
         "network_calls": sum(row.get("network_called") is True for row in rows),
-        "recommendations": sum(isinstance(row.get("recommended_profile"), str) for row in rows),
+        "recommendations": sum(_known_label(row.get("recommended_profile")) for row in rows),
         "gold_labeled": len(labeled),
         "gold_compared": len(compared),
         "recommendation_precision": (sum(row.get("gold_profile") == row.get("recommended_profile") for row in compared) / len(compared)) if compared else None,

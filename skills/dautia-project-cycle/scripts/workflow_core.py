@@ -64,7 +64,7 @@ def records(obj: dict, field: str) -> list[dict]:
     value = obj.get(field, [])
     if not isinstance(value, list) or any(not isinstance(v, dict) for v in value):
         raise ContractError("invalid_list_" + field)
-    ids = [v.get("id") for v in value]
+    ids = [v.get("evidence_id", v.get("id")) if field == "evidence" else v.get("id") for v in value]
     if any(not isinstance(v, str) or not IDENTIFIER.fullmatch(v) for v in ids) or len(set(ids)) != len(ids):
         raise ContractError("invalid_ids_" + field)
     return value
@@ -307,12 +307,17 @@ def gate(packet: dict, stage: str = "preflight") -> dict:
                 issues.extend("invalid_evidence:" + x for x in checked["errors"])
             else:
                 warns.extend(checked["warnings"])
+                normalized = checked["record"]
+                if normalized["objective_id"] != packet["objective_id"] or normalized["project_id"] != packet["project_id"]:
+                    issues.append("evidence_project_or_objective_mismatch:" + normalized["evidence_id"])
     if "project_context" in packet:
         context = validate_project_context(packet["project_context"])
         if not context["valid"]:
             issues.extend("invalid_project_context:" + x for x in context["errors"])
         else:
             warns.extend(context["warnings"])
+            if context["context"]["project_id"] != packet["project_id"]:
+                issues.append("project_context_project_mismatch")
     if stage in ("closeout", "release") and required_components and component_evidence is None:
         issues.extend("required_component_evidence_missing:" + str(x) for x in required_components)
     if component_evidence is not None:
@@ -396,6 +401,9 @@ def gate(packet: dict, stage: str = "preflight") -> dict:
             issues.append("coherence_review_required")
         if packet.get("context_complete") is not True:
             (warns if operation == "read" else issues).append("context_incomplete")
+        if (stage in ("closeout", "release") and operation in ("write_product", "write_tests", "git_write", "external_mutation")
+                and "context_incomplete" in warns):
+            issues.append("project_context_incomplete")
         for source in packet.get("sources", []):
             if source.get("expected_hash") != source.get("observed_hash") or not nonempty(source.get("observed_hash")):
                 issues.append("stale_source:" + source["id"])
