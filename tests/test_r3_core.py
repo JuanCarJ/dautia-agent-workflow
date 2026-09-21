@@ -288,6 +288,15 @@ class CoreTests(unittest.TestCase):
                                               'effort_observed':'medium'})
         self.assertIn('dispatch_astra_role_not_analytic', gate(p, 'closeout')['issues'])
 
+    def test_dispatch_receipt_cannot_use_astra_without_analysis_operation(self):
+        p=packet('read', 'systems_analyst', 'AUDIT'); p['work']['analysis']=False
+        p['runtime'].update(dispatch_required=True, required_agent_type='systems_analyst__astra_medium',
+                            required_profile='astra_medium', dispatch_receipt={
+            'status':'completed','agent_type':'systems_analyst__astra_medium','fork_turns':'none',
+            'child_reference':'child1','evidence':['child-terminal-1'],
+            'model_observed':'gpt-6-astra','effort_observed':'medium'})
+        self.assertIn('dispatch_astra_requires_analysis', gate(p, 'closeout')['issues'])
+
     def test_team_preparation_before_user(self):
         p=packet();p['pending']=[{'id':'test1','status':'needs_team_handoff','authorized':True,'available':True}]
         self.assertEqual(next_action(p)['action'],'team_handoff');self.assertFalse(gate(p,'closeout')['passed'])

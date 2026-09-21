@@ -338,6 +338,10 @@ def dispatch_receipt_issues(packet: dict, stage: str) -> list[str]:
     if (expected.get("family") == "astra"
             and target_role not in policy().get("analysis_roles", [])):
         issues.append("dispatch_astra_role_not_analytic")
+    if (expected.get("family") == "astra"
+            and not (packet.get("work", {}).get("analysis") is True
+                     and packet.get("work", {}).get("operation") in policy().get("analysis_operations", []))):
+        issues.append("dispatch_astra_requires_analysis")
     if receipt.get("model_observed") != expected.get("model"):
         issues.append("dispatch_reported_model_mismatch")
     if receipt.get("effort_observed") != expected.get("effort"):
