@@ -6,6 +6,7 @@ Unknown installed edits are conflicts unless explicitly adopted with a backup.
 """
 from __future__ import annotations
 import argparse
+import copy
 import hashlib
 import json
 import os
@@ -52,16 +53,33 @@ def configured_root(profile: dict, rules: dict) -> dict[str,str]:
 
 
 def root_config(data: bytes, profile: dict, rules: dict) -> bytes:
-    text=data.decode();tomllib.loads(text)
+    try:
+        text=data.decode();before=tomllib.loads(text)
+    except (UnicodeError,tomllib.TOMLDecodeError) as exc:
+        raise ContractError('invalid_existing_root_config') from exc
     selected=configured_root(profile,rules)
+    expected=copy.deepcopy(before)
+    expected['model']=selected['model'];expected['model_reasoning_effort']=selected['reasoning_effort']
+    agents=expected.get('agents')
+    if agents is None:
+        agents={};expected['agents']=agents
+    if not isinstance(agents,dict):
+        raise ContractError('unsupported_agents_config_representation')
+    agents['default_subagent_model']=selected['model']
+    agents['default_subagent_reasoning_effort']=selected['reasoning_effort']
     lines=text.splitlines(keepends=True);out=[];table=None;saw_agents=False
     header=re.compile(r'^\s*\[([^\[\]]+)\]\s*(?:#.*)?$')
+    array_header=re.compile(r'^\s*\[\[([^\[\]]+)\]\]\s*(?:#.*)?$')
     root_key=re.compile(r'^\s*(model|model_reasoning_effort)\s*=')
     agent_key=re.compile(r'^\s*(default_subagent_model|default_subagent_reasoning_effort)\s*=')
     agent_defaults=(f'default_subagent_model = {json.dumps(selected["model"])}\n'
                     f'default_subagent_reasoning_effort = {json.dumps(selected["reasoning_effort"])}\n')
     for line in lines:
-        match=header.match(line.rstrip('\r\n'))
+        stripped=line.rstrip('\r\n')
+        array_match=array_header.match(stripped)
+        if array_match:
+            table='[['+array_match.group(1).strip()+']]';out.append(line);continue
+        match=header.match(stripped)
         if match:
             table=match.group(1).strip()
             out.append(line)
@@ -77,11 +95,12 @@ def root_config(data: bytes, profile: dict, rules: dict) -> bytes:
         out.extend(['[agents]\n',agent_defaults])
     new=(f'model = {json.dumps(selected["model"])}\n'
          f'model_reasoning_effort = {json.dumps(selected["reasoning_effort"])}\n'+''.join(out))
-    parsed=tomllib.loads(new)
-    if (parsed.get('model')!=selected['model'] or parsed.get('model_reasoning_effort')!=selected['reasoning_effort']
-            or parsed.get('agents',{}).get('default_subagent_model')!=selected['model']
-            or parsed.get('agents',{}).get('default_subagent_reasoning_effort')!=selected['reasoning_effort']):
-        raise ContractError('root_profile_update_failed')
+    try:
+        parsed=tomllib.loads(new)
+    except tomllib.TOMLDecodeError as exc:
+        raise ContractError('root_config_unsupported_representation') from exc
+    if parsed!=expected:
+        raise ContractError('root_config_semantic_drift')
     return new.encode()
 
 

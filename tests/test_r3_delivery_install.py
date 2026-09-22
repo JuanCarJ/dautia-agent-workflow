@@ -107,6 +107,24 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual((parsed['model'],parsed['model_reasoning_effort']),('gpt-6-sol','medium'))
         self.assertEqual((parsed['agents']['default_subagent_model'],parsed['agents']['default_subagent_reasoning_effort']),('gpt-6-sol','medium'))
         self.assertTrue(parsed['agents']['keep']);self.assertEqual(parsed['nested']['value'],'keep')
+    def test_root_config_preserves_array_tables_and_their_model_keys(self):
+        raw=(b'model="old"\n[[tool]]\nname="one"\nmodel="preserve-one"\n'
+             b'default_subagent_model="unrelated"\n[agents]\nkeep=true\n'
+             b'[[tool]]\nname="two"\nmodel="preserve-two"\n')
+        profile=json.loads((ROOT/'profiles/codex-macos.yaml').read_text())
+        rules=json.loads((ROOT/'skills/dautia-project-cycle/config/routing-policy.json').read_text())
+        parsed=__import__('tomllib').loads(install.root_config(raw,profile,rules).decode())
+        self.assertEqual(parsed['tool'],[{'name':'one','model':'preserve-one','default_subagent_model':'unrelated'},
+                                         {'name':'two','model':'preserve-two'}])
+        self.assertTrue(parsed['agents']['keep'])
+        self.assertEqual((parsed['model'],parsed['model_reasoning_effort']),('gpt-6-sol','medium'))
+    def test_root_config_rejects_ambiguous_quoted_or_multiline_keys(self):
+        profile=json.loads((ROOT/'profiles/codex-macos.yaml').read_text())
+        rules=json.loads((ROOT/'skills/dautia-project-cycle/config/routing-policy.json').read_text())
+        ambiguous=(b'"model"="old"\n',b'note="""\nmodel="inside-string"\n"""\n')
+        for raw in ambiguous:
+            with self.subTest(raw=raw),self.assertRaisesRegex(ContractError,'root_config_(?:unsupported_representation|semantic_drift)'):
+                install.root_config(raw,profile,rules)
     def test_symlink_destination_rejected(self):
         target=self.home/'target';target.write_bytes(b'keep');link=self.home/'link';link.symlink_to(target)
         with self.assertRaises(ContractError):install.apply({str(link):(b'new',0o600)},self.config,adopt=True)
