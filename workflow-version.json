@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "contract_version": 15,
-  "release": "15.1.0-gpt6",
+  "release": "15.2.0-semantic",
   "plan_revision": "r3",
-  "base_commit": "ece2fb1ba81dd58222207a910a34f639912f40f8",
+  "base_commit": "4db2de072e307cd2a6e150240bba49d5336545e5",
   "host_pilot_verified": false,
   "decision_support": "deterministic-routing"
 }

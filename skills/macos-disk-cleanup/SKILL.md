@@ -1,6 +1,6 @@
 ---
 name: macos-disk-cleanup
-description: Audit and safely reclaim disk space on macOS with measurement-first diagnostics, explicit destructive authorization, protected-project exclusions, targeted cleanup of Downloads, Xcode artifacts, development caches, VirtualBox files, and legacy container-runtime residue, plus verified before-and-after free-space reporting. Use when the user says the Mac is slow or full, asks what consumes disk, wants Downloads organized, or authorizes deletion of caches, installers, virtual machines, build artifacts, or other local disk hogs.
+description: Diagnose macOS disk or performance pressure, organize files or reclaim authorized space. Audit first; deletion requires scope-specific authority.
 ---
 
 # macOS Disk Cleanup

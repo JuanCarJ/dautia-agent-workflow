@@ -1,6 +1,6 @@
 ---
 name: swiftui-pro
-description: Focused SwiftUI review for modern APIs, accessibility, navigation, data flow, performance, and maintainability. Use for a SwiftUI code review, PR review, or final quality pass. Do not invoke for unrelated iOS work or as a mandatory ceremony after every implementation.
+description: Review SwiftUI code for correctness, accessibility, performance and modern APIs. Use for requested review, not as a mandatory step after every edit.
 license: MIT
 metadata:
   author: Paul Hudson

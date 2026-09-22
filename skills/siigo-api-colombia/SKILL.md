@@ -1,6 +1,6 @@
 ---
 name: siigo-api-colombia
-description: "Use whenever designing, implementing, reviewing, debugging, or answering doubts about a connection to Siigo API Colombia or Siigo Nube: authentication, Partner-Id, endpoints, products, customers, quotations, invoices, DIAN, credit notes, purchases, vouchers/payments, journals, reports, webhooks, catalog sync, MCP adapters, errors, rate limits, idempotency, or account-backed verification. Default to current official evidence and read-only behavior; business writes require explicit authority. This skill is not authoritative for Siigo Mexico."
+description: Build, diagnose or explain Siigo Colombia API integrations using current evidence. Business writes need explicit authority; not authoritative for Siigo Mexico.
 ---
 
 # Siigo API Colombia Expert

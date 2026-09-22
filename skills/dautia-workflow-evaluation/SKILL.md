@@ -1,6 +1,6 @@
 ---
 name: dautia-workflow-evaluation
-description: Evaluate DautIA workflow behavior or model profiles with sanitized Codex replays and attributed outcomes when explicitly requested. Skip ordinary implementation or configuration review.
+description: Evaluate DautIA workflow behavior or model profiles with sanitized Codex replays and attributed outcomes when explicitly requested. Use also for instruction/routing audits; ordinary implementation needs no pilot.
 ---
 
 # DautIA Workflow Evaluation

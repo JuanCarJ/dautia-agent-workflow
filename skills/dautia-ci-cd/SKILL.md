@@ -1,6 +1,6 @@
 ---
 name: dautia-ci-cd
-description: Define and validate project-specific delivery topology, integration branches, component targets, checks and recovery. Use for topology or CI/CD policy changes, not ordinary coding or as a release authorization.
+description: Define or validate delivery topology, integration and release checks. Use for delivery contracts or versioned integration/release, not ordinary coding; grants no release authority.
 ---
 
 # DautIA Delivery Contract — r3

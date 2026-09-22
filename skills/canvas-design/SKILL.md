@@ -1,6 +1,6 @@
 ---
 name: canvas-design
-description: Create an original poster, static artwork, visual identity study, campaign art, or crafted one-page artifact whose output is image-first rather than a product UI. Do not use for ordinary screens, dashboards, copy-heavy documents, or imitation of a living artist.
+description: Create original image-first posters, artwork or visual identity studies. Not for product UI, text-heavy documents or imitation of living artists.
 ---
 
 # Canvas Design

@@ -1,127 +1,95 @@
 ---
 name: dautia-project-cycle
-description: Coordinate a substantive DautIA objective across discovery, audit, implementation, multi-repository delivery or authorized operations; preserve scope and evidence before edits and closure. Ordinary follow-ups reuse the active context.
+description: Coordinate substantive DautIA work, delegation and closeout. Use for a new multi-step objective; reuse the active context on follow-ups.
 metadata:
-  version: "15.0.0-rc1"
+  version: "15.2.0"
 ---
-# DautIA project cycle · r3
+# DautIA project cycle
 
-The principal owns the result, not just dispatch. Skills are methods; the active
-routing policy chooses profiles without changing authority or acceptance.
+Deliver the authorized outcome, with evidence of acceptance and preserved invariants.
+The global/project contracts retain authority, review, environment and Git constraints;
+this skill supplies the relevant execution interfaces, not additional permissions.
 
-## Enter and prepare
+## Prepare the actual boundary
 
-Identify DISCOVERY/AUDIT/IMPLEMENTATION/RELEASE and the actual outcome. Read nearest
-instructions and relevant canonical sources. Reconcile intent, accepted decisions,
-state observed now and test expectations before the first dependent change.
-Preserve material examples, reasons, exclusions and previous decisions. A new
-requirement is not a historical omission; a contradiction now must be resolved now.
-Discovery/audit may produce authorized notes, not silently change canonical scope.
+For material changes or diagnosis, read [prevention](references/r3-prevention.md).
+Bind the request, approved decisions, exclusions, sources, candidate and acceptance;
+trace affected producers, contracts and consumers. Preserve material examples and
+negative findings. Resolve only blocking uncertainties before the dependent change;
+continue independent authorized work. A new requirement is not an earlier omission.
 
-Use `references/r3-prevention.md` for material change/diagnosis. Investigate impact
-through producer -> contract/state -> consumer -> treatment -> check. Do not infer
-no-impact from no edited file. Defer only the block depending on an unresolved
-product decision. Seek accessible information before increasing model effort.
+Use one compact private packet per active objective/block, following
+[packet example](examples/r3-analysis.json). No packet for a trivial direct read.
 
-Load the applicable diagnosis, platform, UI, provider or delivery skill before
-acting on that frontier. `scripts/skill_catalog.py` extracts real metadata without
-deleting collisions or claiming a skill was used. Do not load equivalent browser
-skills or all platform skills by default. Existing project runbooks prevail over
-generic recipes unless the exact change is approved.
+```sh
+python3 scripts/workflow_cli.py gate preflight PACKET --cwd WORKSPACE
+python3 scripts/workflow_cli.py gate dispatch PACKET --cwd WORKSPACE
+python3 scripts/workflow_cli.py gate closeout PACKET --cwd WORKSPACE
+```
 
-## Bind the material boundary
+Preflight precedes material writing; dispatch precedes delegation; closeout precedes
+handback. Exit 3 means unresolved conditions, 2 invalid input/storage. Resolve or report
+the boundary, not bypass it. Gates refresh declared sources and check supplied facts;
+they do not certify semantic truth, user consent or provider state.
 
-Create one compact private packet per active objective/block using the examples
-in `examples/r3-analysis.json`. It contains enough actual context, not a checklist
-of invented confirmations. No packet is required for a trivial direct read.
-Use `scripts/workflow_cli.py gate preflight PACKET --cwd WORKSPACE` before the
-material writer starts; `dispatch` before delegation and `closeout` before closure.
-Exit 3 is an unresolved condition; exit 2 is invalid input/storage. Resolve it or
-report its precise boundary rather than bypassing it to make the check green.
-The checks compare supplied facts and refresh declared source files; they cannot
-prove semantic understanding, authentic human consent or provider truth.
+For complete, partial or scratch project documentation, apply
+[evidence contract](references/evidence-contract.md) and `scripts/evidence_contract.py`
+to the active objective. A functional slice can close while an unrelated demo remains
+pending; incomplete active context blocks its product closeout/release, not discovery.
 
-For projects with complete, partial or scratch documentation, use
-`references/evidence-contract.md` and `scripts/evidence_contract.py`. Evidence is
-bound to the current objective and project. An active workstream may scope the
-documentation status so a complete functional slice can close while a separate
-demo remains pending. Incomplete context may continue through discovery, but it
-blocks product closeout/release for that active scope.
+## Delegate when useful
 
-`bind PACKET --session SESSION --generation GENERATION --cwd WORKSPACE` preserves
-the packet for opt-in root hooks. Rebind at meaningful state changes; preserve
-pause and restart a generation only for a genuinely resumed/new run. Do not use
-binding as a way to invent approval or reset stop limits. A child's parent session
-ID never grants the child the root's authority.
+Before material delegation read [model routing](references/model-routing.md), prepare
+the worker packet and execute:
 
-## Select and execute
+```sh
+python3 scripts/workflow_cli.py dispatch-plan PACKET --agents-dir CODEX_HOME/agents --cwd WORKSPACE
+```
 
-Use `references/model-routing.md` and the versioned candidate policy. Ordinary
-execution uses the role-specific GPT-6 profile, not the parent effort; complex open questions become bounded
-analysis with appropriate evidence, not a writer change or infinite retries.
-Routing is local and deterministic; do not introduce a provider advisor into every
-command. A negative observation, failed test or missing permission is relevant and
-must remain visible in the packet and closeout evidence.
+Use observed host availability and the exact returned qualified target. For writers,
+resolve decisions and classify execution routine/demanding; unknown requires preparation.
+The role policy, not parent effort, selects the profile. Record the exact native target,
+`fork_turns: "none"`, actual start, observed model/effort, child reference and completed
+terminal receipt in `runtime.dispatch_receipt`; retain `runtime.required_agent_type`.
+Prepared JSON is not execution. Generic/mismatched/incomplete children block closeout;
+the principal's replacement artifact is not a child receipt. The CLI does not intercept
+the native tool. Principal profile choices need evidence and do not change the default.
 
-For material delegation, prepare the actual worker packet and call
-`workflow_cli.py dispatch-plan PACKET --agents-dir CODEX_HOME/agents --cwd WORKSPACE`.
-Supply the host's observed available profiles/targets. For product/test writers,
-record whether the decisions are resolved and whether execution is routine,
-demanding or unknown; unresolved decisions return to analysis before writing.
-Unknown execution difficulty requires classification before dispatch, not automatic
-escalation. Luna is restricted to bounded exploration/document extraction. Read
-`references/model-routing.md` for the active role matrix and escalation criteria.
-Use the returned exact `agent_type` in the native spawn and pass the same context.
-Do not substitute the canonical role or silently inherit the parent's effort.
-A material delegation must persist `runtime.required_agent_type` and its terminal
-`runtime.dispatch_receipt`: exact role-qualified target, `fork_turns: "none"`,
-observed model/effort, child reference, `status: "completed"` and evidence.
-Generic `worker`/`code_explorer`, missing or mismatched profile, `fork_turns:
-"all"`, or capacity/incomplete child is a dispatch contract violation and blocks
-closeout; the principal cannot replace that receipt with its own artifact.
-For an explicitly broad visual scope (`work.visual_scope: broad|redesign`), retain
-the design baseline, real-viewport screenshots, responsive and accessibility
-checks, explicit visible-content checks (for example, an analysis explanation and
-its color mapping), and an independent `ux_auditor__PROFILE` handoff. Functional tests do not
-prove visual hierarchy, continuity with the existing design, or user impact.
-A prepared JSON request is not a spawned child: record its actual start/report and
-receive its delivery. The CLI does not intercept the native tool. A principal choice
-among ordinary eligible profiles requires explicit evidence and remains separate from
-the configured default.
+Keep independent blocks/resources isolated, depth one, one writer/operator per mutable
+resource. `workflow_cli.py lease` is a cooperative same-host lease, not a security or
+distributed lock. Obtain the independent reviewer's first judgment before comparing
+conclusions. Preserve failures rather than route around them or add a provider advisor.
 
-Delegate only a useful bounded block. Retain one writer per workspace and one
-operator per simulator/browser/side-effectful resource. `workflow_cli.py lease`
-provides a cooperative same-host lease; it is not a distributed or security lock.
-Workers never create grandchildren. Ask independent reviewers for their first
-judgment before comparing conclusions. Resolve disputes by evidence, not votes.
+## Check, integrate and finish
 
-Unknown cause -> hypothesis and discriminating observation before a patch. New
-regression/refuted premise -> reframe the affected block, retain evidence and
-continue independent work. Do not simply add delay/hit-target/configuration layers.
+Acceptance determines checks and permitted scope. Unknown cause requires diagnosis
+before a speculative patch; a refuted premise or regression reopens the affected work.
+Retain failed attempts and justify oracle exceptions independently. Broad/redesign
+visual work retains the global design-baseline, viewport, responsive, accessibility,
+visible-content and independent UX handoff requirements; functional tests alone do not
+prove user impact. No live PASS from offline fixtures.
 
-## Verify, integrate and continue
+For versioned integration or release, use `dautia-ci-cd`; for workspace reconciliation,
+read [Git/workspaces](references/r3-git-workspaces.md). Product review compares original
+acceptance and current candidate independently; its author fixes findings. The reviewer
+neither edits nor merges the audited candidate. Existing project runbooks prevail
+unless the exact change is authorized. External effects need separate authority and
+readback; unknown prior effects require reconciliation before retry.
 
-Check intended behavior and preserved invariants. A test that also passes on the
-broken variant does not prove repair; independently justify any exception.
-Failed attempts remain evidence even after a later pass. Tie checks to the exact
-candidate, config, artifact and environment. No live PASS from offline fixtures.
-Product changes require independent review against original acceptance. An author
-fixes findings; a reviewer does not edit their object or merge it themselves.
+Continue remaining authorized execution, corrections, checks and team handoffs before
+handback. Missing hardware/provider access leaves that boundary unverified while
+independent work proceeds. Return only actual user decisions, physical actions or proven
+external blockers. Respect pause and budget; do not invent ongoing monitoring.
 
-Use `dautia-ci-cd` for versioned integration or release and `r3-git-workspaces.md`
-for local ownership/closure. No generic dev branch or cleanup. Provider effects
-are separately authorized and verified. If a prior external effect is unknown,
-reconcile before retry. A build/health/upload does not imply tester availability
-or a business-channel response.
+## Conditional tools and references
 
-Before handback, list the relevant remaining actions. Execute authorized available
-work or internal team preparation. Return only real user decisions, physical actions
-or proven external blockers. Respect stop/pause/budgets; no fabricated heartbeat.
-
-## Evidence and installation boundaries
-
-Use `references/observability.md` and `references/r3-harness.md`. Minimal events
-supplement the existing collector, not raw logs or an additional agent. Preserve
-negative evidence and mandatory context independently of optional reranking.
-Installed sources, configured profiles, observed calls and accepted outcomes are
-different claims. Host/model/SDK validation is not established by static tests.
+- Before acting on a platform/provider/UI boundary, load its relevant skill. Do not
+  load all platform or equivalent browser skills. `scripts/skill_catalog.py` reads
+  actual metadata without deleting collisions or proving usage.
+- For telemetry, read [observability](references/observability.md); for installation,
+  hooks or client/runtime claims, read [harness](references/r3-harness.md). Installed,
+  requested, observed and accepted are separate claims; static tests do not prove runtime.
+- Only when using opt-in root hooks: `bind PACKET --session SESSION --generation
+  GENERATION --cwd WORKSPACE`. Rebind meaningful changes, preserve pause and restart
+  generations only for a genuinely resumed/new run. Binding/parent IDs do not grant
+  authority or reset stop limits.
