@@ -1,4 +1,4 @@
 interface:
   display_name: "Frontend Developer"
   short_description: "Implement production frontend code from a design contract"
-  default_prompt: "Use $frontend-developer to implement within the existing product system. Keep only information and components that help the intended role understand, decide, act or recover, and make every visible state match implemented behavior."
+  default_prompt: "Use $frontend-developer to implement the requested delta within the existing product system. If it is explicit and authorized, execute and verify it without reopening discovery or asking for the same go. Keep visible states aligned with implemented behavior."

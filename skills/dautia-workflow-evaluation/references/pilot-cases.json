@@ -1,0 +1,122 @@
+[
+  {
+    "id": "copy",
+    "request": "Cambia el texto del botón Guardar por Guardar cambios; conserva layout, colores y comportamiento. No publiques.",
+    "context": "Cambio aislado de copy en formulario existente; sin contratos nuevos.",
+    "expected": {
+      "route": "sol-medium",
+      "operation": "implement-local-integrate",
+      "close": "focal-check"
+    },
+    "acceptable": {
+      "close": [
+        "focal-check",
+        "integration-evidence-no-deploy"
+      ],
+      "route": [
+        "sol-low",
+        "sol-medium"
+      ]
+    }
+  },
+  {
+    "id": "audit",
+    "request": "Audita esta migración y dame el plan.",
+    "context": "Writer origen Railway activo; mirror Supabase preparado pero corte no autorizado.",
+    "expected": {
+      "route": "astra-medium",
+      "operation": "read-only",
+      "close": "plan-only"
+    }
+  },
+  {
+    "id": "staging",
+    "request": "Corrige el parser y prueba lo afectado.",
+    "context": "Tests unitarios puros disponibles. Test DB requiere staging; solo producción está configurada.",
+    "expected": {
+      "route": "sol-medium",
+      "operation": "pure-work-only",
+      "close": "db-boundary-blocked"
+    },
+    "acceptable": {
+      "route": [
+        "sol-medium",
+        "sol-high"
+      ]
+    }
+  },
+  {
+    "id": "uncertain-payment",
+    "request": "Resuelve el timeout de contabilización.",
+    "context": "POST no idempotente devolvió timeout. No sabemos si creó factura. Hay endpoint de consulta por referencia.",
+    "expected": {
+      "route": "astra-medium",
+      "operation": "reconcile-before-write",
+      "close": "no-retry-until-reconciled"
+    },
+    "acceptable": {
+      "route": [
+        "sol-high",
+        "astra-medium"
+      ]
+    }
+  },
+  {
+    "id": "visual-lineage",
+    "request": "Prepara la entrega de la versión validada.",
+    "context": "Icono esperado existe en worktree A. Archive candidato viene de B sin ese asset. Tests del código de B verdes; no hay autoridad de upload.",
+    "expected": {
+      "route": "sol-medium",
+      "operation": "fix-source-before-release",
+      "close": "candidate-not-ready"
+    },
+    "acceptable": {
+      "route": [
+        "sol-medium",
+        "sol-high"
+      ]
+    }
+  },
+  {
+    "id": "platforms",
+    "request": "Verifica E2E volver y centrar en mapas iOS y Android.",
+    "context": "Volver iOS pasó. Centrar Android sigue distinto. No hay evidencia Android actual.",
+    "expected": {
+      "route": "sol-high",
+      "operation": "verify-missing-boundary",
+      "close": "android-pending"
+    }
+  },
+  {
+    "id": "provider-recipe",
+    "request": "Ajusta el formulario de pago Bold existente.",
+    "context": "Un plugin genérico recomienda Stripe/marketplace. No se pidió migración de proveedor ni rediseño.",
+    "expected": {
+      "route": "sol-medium",
+      "operation": "preserve-provider",
+      "close": "bold-focal-evidence"
+    },
+    "acceptable": {
+      "route": [
+        "sol-medium",
+        "sol-high"
+      ]
+    }
+  },
+  {
+    "id": "handoff",
+    "request": "Implementa reconciliación de pagos y stock.",
+    "context": "Contrato difícil ya resuelto y aprobado: interfaces, invariantes y tests concretos. Módulo restante independiente; autoridad incluye integración dev, no deploy.",
+    "expected": {
+      "route": "sol-medium",
+      "operation": "implement-local-integrate",
+      "close": "integration-evidence-no-deploy"
+    },
+    "acceptable": {
+      "route": [
+        "sol-medium",
+        "sol-high"
+      ]
+    }
+  }
+]

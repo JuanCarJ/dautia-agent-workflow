@@ -57,7 +57,7 @@ ID never grants the child the root's authority.
 ## Select and execute
 
 Use `references/model-routing.md` and the versioned candidate policy. Ordinary
-execution remains on the configured default; complex open questions become bounded
+execution uses the role-specific GPT-6 profile, not the parent effort; complex open questions become bounded
 analysis with appropriate evidence, not a writer change or infinite retries.
 Routing is local and deterministic; do not introduce a provider advisor into every
 command. A negative observation, failed test or missing permission is relevant and
@@ -68,6 +68,9 @@ For material delegation, prepare the actual worker packet and call
 Supply the host's observed available profiles/targets. For product/test writers,
 record whether the decisions are resolved and whether execution is routine,
 demanding or unknown; unresolved decisions return to analysis before writing.
+Unknown execution difficulty requires classification before dispatch, not automatic
+escalation. Luna is restricted to bounded exploration/document extraction. Read
+`references/model-routing.md` for the active role matrix and escalation criteria.
 Use the returned exact `agent_type` in the native spawn and pass the same context.
 Do not substitute the canonical role or silently inherit the parent's effort.
 A material delegation must persist `runtime.required_agent_type` and its terminal

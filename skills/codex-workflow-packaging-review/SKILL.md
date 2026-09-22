@@ -57,17 +57,28 @@ Before recommending creation:
 
 Do not create a project-specific duplicate of a generic skill merely because the evidence came from one project.
 
-## GPT-5.6 Prompt and Agent Gate
+## Prompt and Agent Contract Gate
 
-When reviewing GPT-5.6 skills, agents, or prompt stacks, use representative real traces and prefer surgical edits. Check whether each contract states the outcome, success criteria, evidence, authority, relevant tool routing, required output, and stop rules. Remove repeated process/style rules, obsolete scaffolding, irrelevant tools, and contradictions before adding instructions.
+When reviewing skills, agents, or prompt stacks, use representative real traces and prefer surgical edits. Check whether each contract states the outcome, success criteria, evidence, authority, relevant tool routing, required output, and stop rules. Remove repeated process/style rules, obsolete scaffolding, irrelevant tools, and contradictions before adding instructions.
 
-Do not infer that the root orchestrator should be downgraded from aggregate effort counts. Preserve its configured `high` default when it owns cross-boundary quality, architecture, integration, risk, and the final verdict. Use `medium` as the balanced baseline for bounded deterministic implementers, documentary passes, and other scoped roles. Keep `xhigh` only where task complexity, cost of error, or matched evals show a material quality gain. Never use reasoning effort as a substitute for missing acceptance, dependency, routing, or validation rules. Change one prompt group or effort level at a time and rerun the same representative cases. Compare correctness and completeness first, then calls, turns, retries, tokens, latency, cost, duplicated evidence, and time waiting without new signal.
+Evaluate the models and reasoning efforts actually configured in the current environment. Do not preserve, raise, or lower an effort level from role names or aggregate activity counts alone. Change one prompt group, model, or effort level at a time and rerun the same representative cases. Compare correctness and completeness first, then total calls, turns, retries, tokens, latency, cost, duplicated evidence, and time waiting without new signal. Never use model choice or reasoning effort as a substitute for missing acceptance, dependency, routing, or validation rules.
 
 For long-running workflows, distinguish productive build/verification time from coordination and promotion lead time. Penalize repeated unchanged polling, stale persisted reasoning, redundant agents, re-reading stable baselines, and gates that do not reduce a named risk. Prefer sparse updates at major phase changes and a stop once the requested outcome has enough evidence.
 
-Treat any of these as a measured orchestration regression requiring a surgical contract change: user-aborted goal for excessive duration, more than half of waits timing out, repeated task fingerprints, repeated `task_complete` without terminal outcome, `fork_turns="all"` without evidence need, or a prepared artifact that never reaches authorized promotion. Do not hide these failures behind green tests or high local product quality.
+Treat these as candidate orchestration regressions only when traces show that they harmed the requested result: a user-aborted goal for excessive duration, repeated waits without a dependency signal or state change, repeated task fingerprints, repeated `task_complete` without terminal outcome, full-history forks without evidence need, or a prepared artifact that never reaches an authorized promotion. Diagnose the cause before changing the contract; elapsed time or a timeout ratio alone is not proof of poor orchestration. Do not hide confirmed failures behind green tests or high local product quality.
 
 Also treat false-positive routing as a regression: selecting a skill from a keyword instead of the requested outcome, surfacing a non-blocking governance contradiction before the product finding, justifying read-only work with unrelated branch commentary, or using GUI automation when CLI, MCP, logs, code, or a specialized browser provides equivalent evidence. Test edits against the original user prompt and require the response to lead with that prompt's outcome.
+
+## Maintain instructions with progressive disclosure
+
+Focused methods update: 2026-09-09. Give each conditional reference a concrete
+trigger and expected use; improve that pointer before copying its contents into
+the entrypoint. Keep caveats with the rule they qualify and one authoritative
+owner for each requirement. Preserve explicit authority and environment guards;
+do not remove them based on a theory about negative phrasing or model capability.
+Validate edits against representative requests and contradictory cases, rather
+than assuming shorter instructions improve quality. Reuse existing canonical
+sources instead of adding a parallel glossary, tracker or model-specific catalog.
 
 ## Choose the Smallest Form
 

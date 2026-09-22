@@ -1,13 +1,13 @@
 ---
 name: user-surface-value-review
-description: Use after an implementation changes a user-visible surface, or when reviewing whether copy, KPIs, cards, badges, tables, icons, alerts, help, terminology, or controls add contextual value. Review only the changed surface against the real role, task, domain, behavior, and observable UI. Skip backend-only, infrastructure, data, and refactor work with no visible delta. This is a focal validation lens, not a full redesign, extra workflow phase, mandatory agent, or release gate.
+description: Use when a changed user-visible surface leaves a material unresolved question about whether copy, KPIs, cards, badges, tables, icons, alerts, help, terminology, or controls add contextual value. Review only the changed surface against the real role, task, domain, behavior, and observable UI. Skip backend-only, infrastructure, data, and refactor work with no visible delta. This is a focal validation lens, not a full redesign, extra workflow phase, mandatory agent, or release gate.
 ---
 
 # User Surface Value Review
 
 Determine whether each affected visible element earns its place. A datum can be true and a component can be attractive while still being irrelevant. Conversely, a dense report can be excellent when every element supports a real decision.
 
-Apply this file once within the validation of a user-visible implementation. It does not grant implementation or release authority. If the same request already authorizes implementation, return findings to that implementation loop; otherwise report them without editing.
+Apply this lens within existing validation only for an unresolved value question. Reuse equivalent UI/UX findings and evidence; a visible change alone does not require loading this file or adding another reviewer. It does not grant implementation or release authority. If the same request already authorizes implementation, return findings to that implementation loop; otherwise report them without editing.
 
 ## Scope
 
