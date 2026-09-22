@@ -1,6 +1,6 @@
 ---
 name: gelotra-readonly-research
-description: Use when reverse engineering or documenting Redecarga's Gelotra workflows in read-only mode, including GELOTRA/Gelotra screens, Aforo, Clientes, Acuerdos, Centros Logisticos, tarifarios, usuarios/perfiles, cumplidos, EXXE guide/status/barcode flows, guide generation, tracking, billing, or Playwright capture of Gelotra UI. This is for safe discovery and documentation, not changing Gelotra data.
+description: Research and document Redecarga Gelotra/EXXE workflows through read-only evidence. Never changes Gelotra data.
 ---
 
 # Gelotra Readonly Research

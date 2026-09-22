@@ -1,6 +1,6 @@
 ---
 name: apple-app-review-submission
-description: Create or explicitly prepare to create an Apple App Review submission in App Store Connect for a concrete app version and build, including a resubmission after rejection. Use this skill only when the user is going to create that submission request. Do not use it for generic App Review questions, TestFlight or review-status checks, local release audits, isolated What's New or review-note copy, rejection analysis without intent to resubmit, or general release closeout. It preserves the separate authority required for upload, Add for Review, Submit for Review, expedite, and release actions.
+description: Prepare or create an Apple App Review submission for a concrete app version/build. Use for submission or resubmission intent, not status, TestFlight or isolated review copy.
 ---
 
 # Apple App Review Submission

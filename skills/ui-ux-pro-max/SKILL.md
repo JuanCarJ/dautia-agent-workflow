@@ -1,6 +1,6 @@
 ---
 name: ui-ux-pro-max
-description: "Use when the task needs searchable UI/UX design intelligence: palette direction, typography pairings, style recommendations, chart choice, landing structure, accessibility rules, and stack-specific implementation guidance. Use it as a design database and decision aid, not as a replacement for product judgment."
+description: Search bundled UI design data for palettes, typography, charts and stack guidance when a concrete design decision needs options.
 ---
 
 # UI/UX Pro Max

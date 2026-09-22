@@ -1,6 +1,6 @@
 ---
 name: digitalocean-ssh-ops
-description: "Operate the user's DigitalOcean host through SSH alias `servidor_do_1`: inspect or deploy a named project, manage its Docker Compose services, diagnose container/proxy health, or prepare rollback. Use when the user explicitly names DigitalOcean, `servidor_do_1`, the DO server, or a known `/opt/*` project on that host; generic deploy, Docker, logs, or production requests do not select this skill by themselves."
+description: Inspect or operate a named project on DigitalOcean host servidor_do_1. Use when that host is identified, not for generic deploy, Docker or log requests.
 ---
 
 # DigitalOcean SSH Ops
