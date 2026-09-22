@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import stat
 import subprocess
@@ -40,20 +41,56 @@ def git_revision(repo: Path = ROOT) -> str:
 def sha(data: bytes) -> str: return hashlib.sha256(data).hexdigest()
 
 
-def root_config(data: bytes) -> bytes:
+def configured_root(profile: dict, rules: dict) -> dict[str,str]:
+    root=profile.get('codex_root')
+    default=rules.get('profiles',{}).get(rules.get('default_profile'))
+    if (not isinstance(root,dict) or not isinstance(default,dict)
+            or root.get('model')!=default.get('model')
+            or root.get('reasoning_effort')!=default.get('effort')):
+        raise ContractError('host_root_profile_policy_mismatch')
+    return {'model':root['model'],'reasoning_effort':root['reasoning_effort']}
+
+
+def root_config(data: bytes, profile: dict, rules: dict) -> bytes:
     text=data.decode();tomllib.loads(text)
-    lines=text.splitlines(keepends=True);out=[];at_root=True
+    selected=configured_root(profile,rules)
+    lines=text.splitlines(keepends=True);out=[];table=None;saw_agents=False
+    header=re.compile(r'^\s*\[([^\[\]]+)\]\s*(?:#.*)?$')
+    root_key=re.compile(r'^\s*(model|model_reasoning_effort)\s*=')
+    agent_key=re.compile(r'^\s*(default_subagent_model|default_subagent_reasoning_effort)\s*=')
+    agent_defaults=(f'default_subagent_model = {json.dumps(selected["model"])}\n'
+                    f'default_subagent_reasoning_effort = {json.dumps(selected["reasoning_effort"])}\n')
     for line in lines:
-        if line.lstrip().startswith('['):at_root=False
-        if at_root and __import__('re').match(r'^\s*(model|model_reasoning_effort)\s*=',line):continue
+        match=header.match(line.rstrip('\r\n'))
+        if match:
+            table=match.group(1).strip()
+            out.append(line)
+            if table=='agents':
+                saw_agents=True;out.append(agent_defaults)
+            continue
+        if table is None and root_key.match(line):continue
+        if table=='agents' and agent_key.match(line):continue
         out.append(line)
-    new='model = "gpt-5.6-sol"\nmodel_reasoning_effort = "high"\n'+''.join(out)
-    tomllib.loads(new);return new.encode()
+    if not saw_agents:
+        if out and not out[-1].endswith(('\n','\r')):out.append('\n')
+        if out and ''.join(out).strip():out.append('\n')
+        out.extend(['[agents]\n',agent_defaults])
+    new=(f'model = {json.dumps(selected["model"])}\n'
+         f'model_reasoning_effort = {json.dumps(selected["reasoning_effort"])}\n'+''.join(out))
+    parsed=tomllib.loads(new)
+    if (parsed.get('model')!=selected['model'] or parsed.get('model_reasoning_effort')!=selected['reasoning_effort']
+            or parsed.get('agents',{}).get('default_subagent_model')!=selected['model']
+            or parsed.get('agents',{}).get('default_subagent_reasoning_effort')!=selected['reasoning_effort']):
+        raise ContractError('root_profile_update_failed')
+    return new.encode()
 
 
-def payloads(repo: Path, home: Path, profile_name: str, scope: str='workflow', configure_root: bool=False) -> dict[str,tuple[bytes,int]]:
+def payloads(repo: Path, home: Path, profile_name: str, scope: str='workflow', configure_root: bool=False,
+             extra_skills: list[str] | None=None) -> dict[str,tuple[bytes,int]]:
     if profile_name not in ('codex-macos','wsl-shared'):raise ContractError('unknown_profile')
     profile=load_json((repo/'profiles'/(profile_name+'.yaml')).read_bytes())
+    rules=load_json((repo/'skills/dautia-project-cycle/config/routing-policy.json').read_bytes())
+    configured_root(profile,rules)
     codex=Path(os.environ.get('CODEX_HOME',str(home/'.codex'))).expanduser()
     config=Path(os.environ.get('XDG_CONFIG_HOME',str(home/'.config'))).expanduser()
     if not codex.is_absolute() or not config.is_absolute():raise ContractError('install_roots_must_be_absolute')
@@ -62,6 +99,13 @@ def payloads(repo: Path, home: Path, profile_name: str, scope: str='workflow', c
     result[str(config/'dautia/workflow-version.json')]=((repo/'workflow-version.json').read_bytes(),0o600)
     chosen={'dautia-project-cycle'} if scope=='routing' else {'dautia-project-cycle','dautia-ci-cd'}
     if scope=='all':chosen={p.name for p in (repo/'skills').iterdir() if p.is_dir() and not p.is_symlink()}
+    for name in extra_skills or []:
+        if not isinstance(name,str) or not re.fullmatch(r'[a-z][a-z0-9-]{0,63}',name):
+            raise ContractError('invalid_selected_skill')
+        directory=repo/'skills'/name
+        if not directory.is_dir() or directory.is_symlink():
+            raise ContractError('selected_skill_missing')
+        chosen.add(name)
     for name in sorted(chosen):
         directory=repo/'skills'/name
         if not directory.is_dir():raise ContractError('required_source_skill_missing')
@@ -93,7 +137,7 @@ def payloads(repo: Path, home: Path, profile_name: str, scope: str='workflow', c
     result[str(config/'dautia/hooks.r3.candidate.json')]=(canonical(hooks)+b'\n',0o600)
     if configure_root:
         p=codex/'config.toml';data=p.read_bytes() if p.exists() else b''
-        result[str(p)]=(root_config(data),0o600)
+        result[str(p)]=(root_config(data,profile,rules),0o600)
     return result
 
 
@@ -209,6 +253,7 @@ def rollback(backup: Path, config: Path) -> dict:
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--profile',choices=('codex-macos','wsl-shared'),default='codex-macos');p.add_argument('--scope',choices=('routing','workflow','all'),default='workflow')
+    p.add_argument('--skill',action='append',default=[],help='also manage one explicitly selected repository skill (repeatable)')
     mode=p.add_mutually_exclusive_group();mode.add_argument('--apply',action='store_true');mode.add_argument('--check',action='store_true');mode.add_argument('--rollback',type=Path)
     p.add_argument('--adopt-existing',action='store_true');p.add_argument('--configure-root',action='store_true');a=p.parse_args()
     home=Path.home();config=Path(os.environ.get('XDG_CONFIG_HOME',str(home/'.config'))).expanduser()
@@ -216,7 +261,7 @@ def main():
         if not config.is_absolute():raise ContractError('install_roots_must_be_absolute')
         if a.rollback:result=rollback(a.rollback,config)
         else:
-            files=payloads(ROOT,home,a.profile,a.scope,a.configure_root)
+            files=payloads(ROOT,home,a.profile,a.scope,a.configure_root,a.skill)
             if a.apply:result=apply(files,config,adopt=a.adopt_existing)
             else:
                 registry=config/'dautia/installed-r3.json';prior=load_json(read_private(registry)) if registry.exists() else {'files':{}}

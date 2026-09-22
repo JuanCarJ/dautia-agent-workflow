@@ -47,4 +47,30 @@ class RoutingInstallTests(unittest.TestCase):
             with self.assertRaises(installer.ContractError):installer.rollback(backup,config)
             self.assertEqual(p.read_bytes(),b'new')
 
+    def test_selected_skill_is_transactional_and_preserves_other_skills(self):
+        with tempfile.TemporaryDirectory() as raw:
+            home=Path(raw)/'home';home.mkdir();codex=home/'.codex';config=home/'.config'
+            unrelated=codex/'skills/local-only/SKILL.md';unrelated.parent.mkdir(parents=True);unrelated.write_text('keep\n')
+            env={'HOME':str(home),'CODEX_HOME':str(codex),'XDG_CONFIG_HOME':str(config)}
+            with patch.dict(os.environ,env):
+                files=installer.payloads(ROOT,home,'codex-macos','routing',extra_skills=['ui-ux-designer'])
+                selected=codex/'skills/ui-ux-designer/SKILL.md'
+                self.assertIn(str(selected),files)
+                self.assertNotIn(str(unrelated),files)
+                applied=installer.apply(files,config);self.assertEqual(unrelated.read_text(),'keep\n')
+                selected.write_text('local drift\n')
+                with self.assertRaisesRegex(installer.ContractError,'installed_edits_need_reconciliation'):
+                    installer.apply(files,config)
+                installer.install_write(selected,*files[str(selected)])
+                installer.rollback(Path(applied['backup']),config)
+                self.assertFalse(selected.exists());self.assertEqual(unrelated.read_text(),'keep\n')
+
+    def test_selected_skill_name_and_presence_are_validated(self):
+        with tempfile.TemporaryDirectory() as raw:
+            home=Path(raw)
+            with self.assertRaisesRegex(installer.ContractError,'invalid_selected_skill'):
+                installer.payloads(ROOT,home,'codex-macos',extra_skills=['../escape'])
+            with self.assertRaisesRegex(installer.ContractError,'selected_skill_missing'):
+                installer.payloads(ROOT,home,'codex-macos',extra_skills=['missing-skill'])
+
 if __name__=='__main__':unittest.main()

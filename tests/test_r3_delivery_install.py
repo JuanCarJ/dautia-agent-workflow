@@ -97,8 +97,16 @@ class InstallerTests(unittest.TestCase):
         p=self.home/'shared/bin/file';p.parent.mkdir(parents=True);p.parent.chmod(0o755)
         install.apply({str(p):(b'new',0o700)},self.config);self.assertEqual(p.parent.stat().st_mode&0o777,0o755)
     def test_root_config_only_requested_keys(self):
-        raw=b'# own comment\nmodel="other"\nmodel_reasoning_effort="low"\n[agents.custom]\nmodel="preserve"\n'
-        result=install.root_config(raw).decode();self.assertIn('model="preserve"',result);self.assertIn('# own comment',result);self.assertIn('gpt-5.6-sol',result)
+        raw=(b'# own comment\nmodel="other"\nmodel_reasoning_effort="low"\n'
+             b'[agents]\ndefault_subagent_model="old"\ndefault_subagent_reasoning_effort="high"\nkeep=true\n'
+             b'[agents.custom]\nmodel="preserve"\n[nested]\nvalue="keep"\n')
+        profile=json.loads((ROOT/'profiles/codex-macos.yaml').read_text())
+        rules=json.loads((ROOT/'skills/dautia-project-cycle/config/routing-policy.json').read_text())
+        result=install.root_config(raw,profile,rules).decode();parsed=__import__('tomllib').loads(result)
+        self.assertIn('model="preserve"',result);self.assertIn('# own comment',result)
+        self.assertEqual((parsed['model'],parsed['model_reasoning_effort']),('gpt-6-sol','medium'))
+        self.assertEqual((parsed['agents']['default_subagent_model'],parsed['agents']['default_subagent_reasoning_effort']),('gpt-6-sol','medium'))
+        self.assertTrue(parsed['agents']['keep']);self.assertEqual(parsed['nested']['value'],'keep')
     def test_symlink_destination_rejected(self):
         target=self.home/'target';target.write_bytes(b'keep');link=self.home/'link';link.symlink_to(target)
         with self.assertRaises(ContractError):install.apply({str(link):(b'new',0o600)},self.config,adopt=True)
@@ -109,12 +117,15 @@ class InstallerTests(unittest.TestCase):
         (fixture/'skills/dautia-project-cycle/config/routing-policy.json').write_bytes((ROOT/'skills/dautia-project-cycle/config/routing-policy.json').read_bytes())
         for r,mut in [('implementer','bounded_write'),('systems_analyst','read_only'),('data_security','read_only')]:
             (fixture/'roles'/(r+'.md')).write_text(f'---\nid: "{r}"\ndescription: "Role"\nmutability: "{mut}"\n---\nBounded procedure.\n')
-        profile={'codex_agents':{r:['gpt-5.6-sol','high'] for r in ('implementer','systems_analyst','data_security')}}
+        profile={'codex_agents':{'implementer':['gpt-6-sol','medium'],
+                                 'systems_analyst':['gpt-6-astra','low'],
+                                 'data_security':['gpt-6-sol','high']}}
         adapters=render(fixture,profile)
         import tomllib
-        default=tomllib.loads(adapters['codex/implementer.toml'].decode());self.assertEqual(default['model'],'gpt-5.6-sol');self.assertEqual(default['model_reasoning_effort'],'high')
+        default=tomllib.loads(adapters['codex/implementer.toml'].decode());self.assertEqual(default['model'],'gpt-6-sol');self.assertEqual(default['model_reasoning_effort'],'medium')
         self.assertNotIn('codex/implementer__astra_low.toml',adapters)
-        self.assertIn('codex/systems_analyst__astra_high.toml',adapters)
+        self.assertIn('codex/systems_analyst__astra_medium.toml',adapters)
+        self.assertNotIn('codex/systems_analyst__astra_high.toml',adapters)
         self.assertEqual(tomllib.loads(adapters['codex/data_security.toml'].decode())['sandbox_mode'],'read-only')
 
 
