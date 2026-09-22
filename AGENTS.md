@@ -18,8 +18,10 @@ inventar Git/PR/specs de producto para una lectura operativa sencilla.
 
 ## Política de ejecución
 
-Sol 5.6 high sigue como principal. El implementador de un bloque definido y
-técnicamente manejable usa Sol medium; la ejecución exigente usa high. La política vive
+GPT-6 Sol medium es el principal. El implementador de un bloque definido y
+técnicamente manejable usa Sol medium; la ejecución exigente usa high. Luna high
+atiende exploración o extracción acotada en roles elegibles. Clasificar dificultad
+desconocida antes de escribir; no convertir falta de contexto en más esfuerzo. La política vive
 en `dautia-project-cycle/config/routing-policy.json`, no dentro del método de cada
 skill. No confundir el default del principal con los perfiles de sus trabajadores.
 Antes de despachar, usar `dispatch-plan` y el destino verificado que devuelve;
@@ -35,7 +37,7 @@ base visual (`runtime.design_baseline_evidence`), capturas del viewport real,
 comprobación responsive, accesibilidad y `visual_validation.content_checks`, además de una delegación recibida a
 `ux_auditor__PROFILE`. Los tests funcionales por sí solos no certifican una
 interfaz ni justifican reemplazar el diseño existente.
-El routing local usa medium/high para implementación preparada y Sol high o una
+El routing local usa GPT-6 Sol medium/high para implementación preparada y Sol o una
 consulta Astra low/medium para análisis,
 arquitectura, UX, auditoría, estrategia de pruebas o diagnóstico que lo justifique.
 No elegir Astra por el nombre del rol, longitud del prompt o número de archivos.

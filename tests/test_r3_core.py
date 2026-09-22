@@ -206,7 +206,7 @@ class CoreTests(unittest.TestCase):
         p['runtime']['dispatch_receipt'] = {
             'status': 'incomplete', 'agent_type': 'worker', 'fork_turns': 'all',
             'child_reference': 'child1', 'evidence': ['capacity-error'],
-            'model_observed': 'gpt-5.6-sol', 'effort_observed': 'medium'}
+            'model_observed': 'gpt-6-sol', 'effort_observed': 'medium'}
         issues = gate(p, 'closeout')['issues']
         self.assertIn('child_incomplete', issues)
         self.assertIn('dispatch_agent_type_mismatch', issues)
@@ -218,7 +218,7 @@ class CoreTests(unittest.TestCase):
                             required_profile='sol_medium', dispatch_receipt={
             'status':'completed', 'agent_type':'implementer__sol_medium', 'fork_turns':'none',
             'child_reference':'child1', 'evidence':['child-terminal-1'],
-            'model_observed':'gpt-5.6-sol', 'effort_observed':'medium'})
+            'model_observed':'gpt-6-sol', 'effort_observed':'medium'})
         self.assertTrue(gate(p, 'closeout')['passed'])
 
     def test_broad_visual_change_needs_baseline_viewport_and_ux_review(self):
@@ -232,9 +232,10 @@ class CoreTests(unittest.TestCase):
             visual_validation={'viewport':'1440x900', 'screenshots':['after-1'],
                                 'content_checks':['kmeans-explanation-visible','color-mapping-visible'],
                                 'responsive_checked':True, 'accessibility_checked':True})
-        p['delegations']=[{'id':'ux1','required':True,'required_agent_type':'ux_auditor__sol_high',
-                           'agent_type':'ux_auditor__sol_high','fork_turns':'none',
-                           'model_observed':'gpt-5.6-sol','effort_observed':'high',
+        p['delegations']=[{'id':'ux1','required':True,'required_agent_type':'ux_auditor__astra_low',
+                           'agent_type':'ux_auditor__astra_low','fork_turns':'none',
+                           'model_observed':'gpt-6-astra','effort_observed':'low',
+                           'analysis':True,'operation':'read',
                            'state':'received','candidate_hash':fingerprint(p['candidate']),
                            'evidence':['ux-review-1']}]
         self.assertTrue(gate(p, 'closeout')['passed'])
@@ -246,7 +247,7 @@ class CoreTests(unittest.TestCase):
                                                'content_checks':['visual-content-1'],
                                                'responsive_checked':True,'accessibility_checked':True})
         p['delegations']=[{'id':'ux1','required':True,'required_agent_type':'ux_auditor__sol_high',
-                           'agent_type':'worker','fork_turns':'all','model_observed':'gpt-5.6-sol',
+                           'agent_type':'worker','fork_turns':'all','model_observed':'gpt-6-sol',
                            'effort_observed':'high','state':'received',
                            'candidate_hash':fingerprint(p['candidate']),'evidence':['ux-review-1']}]
         issues=gate(p,'closeout')['issues']
@@ -261,10 +262,10 @@ class CoreTests(unittest.TestCase):
                                                'responsive_checked':True,'accessibility_checked':True})
         p['delegations']=[{'id':'ux1','required':False,'required_agent_type':'ux_auditor__sol_high',
                            'agent_type':'ux_auditor__sol_high','fork_turns':'none',
-                           'model_observed':'gpt-5.6-sol','effort_observed':'high'}]
+                           'model_observed':'gpt-6-sol','effort_observed':'high'}]
         self.assertIn('ux_auditor_delegation_required', gate(p, 'closeout')['issues'])
 
-    def test_broad_visual_change_rejects_astra_above_medium(self):
+    def test_broad_visual_change_rejects_removed_astra_high_profile(self):
         p=packet('write_product', 'implementer', 'IMPLEMENTATION'); p['work']['visual_scope']='broad'
         p['runtime'].update(design_baseline_evidence=['baseline-1'],
                             visual_validation={'viewport':'1440x900','screenshots':['after-1'],
@@ -274,7 +275,7 @@ class CoreTests(unittest.TestCase):
                            'model_observed':'gpt-6-astra','effort_observed':'high',
                            'state':'received','candidate_hash':fingerprint(p['candidate']),
                            'evidence':['ux-review-1']}]
-        self.assertIn('delegation_astra_effort_above_ceiling:ux1', gate(p, 'closeout')['issues'])
+        self.assertIn('delegation_profile_definition_missing:ux1', gate(p, 'closeout')['issues'])
 
     def test_dispatch_receipt_cannot_relabel_target_profile_or_use_astra_for_writer(self):
         p=packet('write_product', 'implementer', 'IMPLEMENTATION')
@@ -282,7 +283,7 @@ class CoreTests(unittest.TestCase):
                             required_profile='sol_high', dispatch_receipt={
             'status':'completed','agent_type':'implementer__sol_medium','fork_turns':'none',
             'child_reference':'child1','evidence':['child-terminal-1'],
-            'model_observed':'gpt-5.6-sol','effort_observed':'medium'})
+            'model_observed':'gpt-6-sol','effort_observed':'medium'})
         self.assertIn('dispatch_required_profile_mismatch', gate(p, 'closeout')['issues'])
         p['runtime'].update(required_agent_type='implementer__astra_medium', required_profile='astra_medium',
                             dispatch_receipt={'status':'completed','agent_type':'implementer__astra_medium',
@@ -300,13 +301,24 @@ class CoreTests(unittest.TestCase):
             'model_observed':'gpt-6-astra','effort_observed':'medium'})
         self.assertIn('dispatch_astra_requires_analysis', gate(p, 'closeout')['issues'])
 
+    def test_luna_receipt_is_limited_to_named_read_roles_and_operations(self):
+        p=packet('read','code_explorer','AUDIT')
+        p['runtime'].update(dispatch_required=True,required_agent_type='code_explorer__luna_high',
+                            required_profile='luna_high',dispatch_receipt={
+            'status':'completed','agent_type':'code_explorer__luna_high','fork_turns':'none',
+            'child_reference':'child1','evidence':['child-terminal-1'],
+            'model_observed':'gpt-6-luna','effort_observed':'high'})
+        self.assertTrue(gate(p,'closeout')['passed'])
+        p['work']['operation']='external_mutation'
+        self.assertIn('dispatch_luna_not_read_candidate',gate(p,'closeout')['issues'])
+
     def test_dispatch_receipt_cannot_use_explicit_sol_profile_without_override(self):
         p=packet('read', 'systems_analyst', 'AUDIT')
         p['runtime'].update(dispatch_required=True, required_agent_type='systems_analyst__sol_xhigh',
                             required_profile='sol_xhigh', dispatch_receipt={
             'status':'completed','agent_type':'systems_analyst__sol_xhigh','fork_turns':'none',
             'child_reference':'child1','evidence':['child-terminal-1'],
-            'model_observed':'gpt-5.6-sol','effort_observed':'xhigh'})
+            'model_observed':'gpt-6-sol','effort_observed':'xhigh'})
         self.assertIn('dispatch_explicit_override_required', gate(p, 'closeout')['issues'])
 
     def test_delegation_cannot_use_explicit_sol_profile_without_override(self):
@@ -314,7 +326,7 @@ class CoreTests(unittest.TestCase):
         p['delegations']=[{'id':'analysis1','required':True,
                            'required_agent_type':'systems_analyst__sol_xhigh',
                            'agent_type':'systems_analyst__sol_xhigh','fork_turns':'none',
-                           'model_observed':'gpt-5.6-sol','effort_observed':'xhigh',
+                           'model_observed':'gpt-6-sol','effort_observed':'xhigh',
                            'state':'received','candidate_hash':fingerprint(p['candidate']),
                            'evidence':['analysis-1']}]
         self.assertIn('delegation_explicit_override_required:analysis1', gate(p, 'closeout')['issues'])
@@ -378,11 +390,15 @@ class CoreTests(unittest.TestCase):
 
 
 class RoutingTests(unittest.TestCase):
-    def test_role_defaults_preserve_root_high_and_implementer_medium(self):
-        from workflow_core import READ_ROLES,WRITE_ROLES
+    def test_role_defaults_match_approved_gpt6_matrix(self):
+        from workflow_core import READ_ROLES,WRITE_ROLES,role_default
+        expected={'code_explorer':'luna_high','data_security':'sol_high','decision_gate':'sol_high',
+                  'implementer_complex':'sol_high','systems_analyst':'astra_low',
+                  'systems_implementer':'sol_high','ux_auditor':'astra_low'}
         for role in READ_ROLES|WRITE_ROLES:
             with self.subTest(role=role):
-                self.assertEqual(profile_selection(role,'read',analysis=True)['selected'],'sol_medium' if role=='implementer' else 'sol_high')
+                self.assertEqual(profile_selection(role,'read',analysis=True)['selected'],expected.get(role,'sol_medium'))
+                self.assertEqual(role_default(role),expected.get(role,'sol_medium'))
 
     def test_no_astra_writer(self):
         self.assertEqual(profile_selection('implementer','write_product',analysis=False,decisions_resolved=True,execution_difficulty='routine',recommendation='astra_medium')['selected'],'sol_medium')
@@ -391,17 +407,45 @@ class RoutingTests(unittest.TestCase):
         self.assertEqual(profile_selection('ux_auditor','read',analysis=True,recommendation='astra_low',available=['sol_high','astra_low'])['selected'],'astra_low')
 
     def test_shadow_does_not_change_default(self):
-        self.assertEqual(profile_selection('ux_auditor','read',analysis=True,recommendation='astra_low',shadow=True)['selected'],'sol_high')
+        self.assertEqual(profile_selection('ux_auditor','read',analysis=True,recommendation='sol_high',shadow=True)['selected'],'astra_low')
 
     def test_explicit_high_no_silent_downgrade(self):
         e={'profile':'astra_high','source_kind':'user','source_refs':['user1']}
         result=profile_selection('systems_analyst','read',analysis=True,explicit=e,available=['astra_high'])
-        self.assertIsNone(result['selected']);self.assertEqual(result['status'],'blocked');self.assertEqual(result['reason'],'profile_above_astra_ceiling')
+        self.assertIsNone(result['selected']);self.assertEqual(result['status'],'blocked');self.assertEqual(result['reason'],'unknown_requested_profile')
         result=profile_selection('systems_analyst','read',analysis=True,explicit=e,available=['sol_high'])
         self.assertIsNone(result['selected']);self.assertEqual(result['status'],'blocked')
 
     def test_unavailable_sol_does_not_select_astra(self):
         self.assertIsNone(profile_selection('systems_analyst','read',analysis=True,available=['astra_medium'])['selected'])
+
+    def test_denied_default_does_not_silently_fallback(self):
+        result=profile_selection('systems_analyst','read',analysis=True,
+                                 available=['sol_medium','sol_high','astra_low'],denied=['astra_low'])
+        self.assertIsNone(result['selected']);self.assertEqual(result['reason'],'default_unavailable_no_silent_escalation')
+
+    def test_principal_can_select_bounded_sol_alternative_with_evidence(self):
+        result=profile_selection('release_operator','external_mutation',analysis=False,
+                                 principal_choice={'profile':'sol_high','evidence_refs':['release-risk-1']},
+                                 available=['sol_medium','sol_high'])
+        self.assertEqual(result['selected'],'sol_high');self.assertEqual(result['reason'],'principal_evidence_selection')
+
+    def test_sol_xhigh_requires_explicit_user_override(self):
+        choice=profile_selection('systems_analyst','read',analysis=True,
+                                 principal_choice={'profile':'sol_xhigh','evidence_refs':['risk-1']},
+                                 available=['sol_xhigh'])
+        self.assertEqual(choice['reason'],'principal_choice_not_eligible')
+        explicit=profile_selection('systems_analyst','read',analysis=True,
+                                   explicit={'profile':'sol_xhigh','source_kind':'user','source_refs':['user1']},
+                                   available=['sol_xhigh'])
+        self.assertEqual(explicit['selected'],'sol_xhigh')
+
+    def test_unsupported_profile_family_is_rejected(self):
+        import copy
+        from workflow_core import policy
+        rules=copy.deepcopy(policy());rules['profiles']['other']={'model':'x','effort':'low','family':'other'}
+        with self.assertRaisesRegex(ContractError,'invalid_profile_definition'):
+            profile_selection('systems_analyst','read',analysis=True,rules=rules)
 
     def test_runtime_truth_unknown(self):
         result=profile_selection('implementer','write_product',analysis=False)

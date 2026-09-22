@@ -83,19 +83,52 @@ def role_default(role: str, rules: dict | None = None) -> str:
     return rules.get("role_defaults", {}).get(role, rules["default_profile"])
 
 
+def _validate_routing_policy(rules: dict) -> None:
+    profiles = rules.get("profiles")
+    if not isinstance(profiles, dict) or not profiles:
+        raise ContractError("invalid_profile_registry")
+    for key, entry in profiles.items():
+        if (not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", key) or not isinstance(entry, dict)
+                or entry.get("family") not in ("sol", "astra", "luna")
+                or not nonempty(entry.get("model")) or not nonempty(entry.get("effort"))):
+            raise ContractError("invalid_profile_definition")
+    references = [rules.get("default_profile"), rules.get("demanding_implementation_profile")]
+    references.extend(rules.get("role_defaults", {}).values())
+    for field in ("ordinary_analysis_profiles", "ordinary_default_profiles", "ordinary_implementation_profiles"):
+        values = rules.get(field)
+        if not isinstance(values, list) or any(not nonempty(value) for value in values):
+            raise ContractError("invalid_" + field)
+        references.extend(values)
+    if any(value not in profiles for value in references):
+        raise ContractError("profile_reference_missing")
+
+
 def role_profiles(role: str, rules: dict | None = None) -> list[str]:
     """Finite renderable profiles. The effect gate still owns operation permission."""
     rules = rules or policy()
     if role not in READ_ROLES | WRITE_ROLES:
         raise ContractError("unknown_role")
-    for key, entry in rules["profiles"].items():
-        if (not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", key) or not isinstance(entry, dict)
-                or entry.get("family") not in ("sol", "astra")
-                or not nonempty(entry.get("model")) or not nonempty(entry.get("effort"))):
-            raise ContractError("invalid_profile_definition")
+    _validate_routing_policy(rules)
     return [key for key, profile in rules["profiles"].items()
             if profile["family"] == "sol" or
-            (profile["family"] == "astra" and role in READ_ROLES and role in rules["analysis_roles"])]
+            (profile["family"] == "astra" and profile["effort"] in ("low", "medium")
+             and role in READ_ROLES and role in rules["analysis_roles"]) or
+            (profile["family"] == "luna" and profile["effort"] == "high"
+             and role in READ_ROLES and role in rules.get("luna_roles", []))]
+
+
+def _profile_allowed(profile_id: str, role: str, operation: str, analytic: bool, rules: dict) -> bool:
+    profile = rules["profiles"].get(profile_id, {})
+    family = profile.get("family")
+    if family == "sol":
+        return True
+    if family == "astra":
+        return analytic and role in READ_ROLES and profile.get("effort") in ("low", "medium")
+    if family == "luna":
+        return (profile.get("effort") == "high" and role in READ_ROLES
+                and role in rules.get("luna_roles", [])
+                and operation in rules.get("luna_operations", []))
+    return False
 
 
 def routing_arguments(packet: dict) -> dict:
@@ -122,11 +155,12 @@ def profile_selection(role: str, operation: str, *, analysis: bool,
                       rules: dict | None = None) -> dict:
     """Choose an eligible profile, never grant authority or claim a worker ran.
 
-    Prepared implementation can use medium/high. Missing or open decisions need
-    preparation, not extra model effort. Difficulty unknown uses high as fallback
-    but requires the principal to choose among eligible profiles with evidence. Explicit overrides do not bypass this.
+    Prepared implementation can use medium/high. Missing or open decisions and
+    unknown execution difficulty need classification, not extra model effort.
+    Explicit overrides do not bypass this.
     """
     rules = rules or policy()
+    _validate_routing_policy(rules)
     if role not in READ_ROLES | WRITE_ROLES or operation not in OPERATIONS:
         raise ContractError("unknown_role_or_operation")
     if type(analysis) is not bool or decisions_resolved is not None and type(decisions_resolved) is not bool:
@@ -143,7 +177,10 @@ def profile_selection(role: str, operation: str, *, analysis: bool,
     implementing = role in rules.get("implementation_roles", []) and operation in rules.get("implementation_operations", [])
     kind = "implementation" if implementing else "analysis" if analytic else "default"
     candidates = list(rules["ordinary_analysis_profiles"] if analytic else
-                      rules.get("ordinary_implementation_profiles", [base]) if implementing else [base])
+                      rules.get("ordinary_implementation_profiles", [base]) if implementing else
+                      rules.get("ordinary_default_profiles", [base]))
+    candidates = [profile for profile in candidates
+                  if _profile_allowed(profile, role, operation, analytic, rules)]
     requested = (explicit or {}).get("profile")
     reason, status = "default", "selected"
     def blocked(code: str) -> dict:
@@ -153,9 +190,10 @@ def profile_selection(role: str, operation: str, *, analysis: bool,
     if implementing:
         if decisions_resolved is not True:
             return blocked("implementation_decisions_unresolved" if decisions_resolved is False else "implementation_readiness_required")
-        if execution_difficulty != "routine":
-            base = rules["default_profile"]
+        if execution_difficulty == "unknown":
+            return blocked("execution_difficulty_classification_required")
         if execution_difficulty == "demanding":
+            base = rules["demanding_implementation_profile"]
             candidates = [p for p in candidates if p != "sol_medium"]
     if requested is not None:
         if requested not in rules["profiles"]:
@@ -167,7 +205,13 @@ def profile_selection(role: str, operation: str, *, analysis: bool,
         if (rules["profiles"][requested]["family"] == "astra"
                 and rules["profiles"][requested].get("effort") not in ("low", "medium")):
             return blocked("profile_above_astra_ceiling")
-        candidates.append(requested)
+        if not _profile_allowed(requested, role, operation, analytic, rules):
+            return blocked("luna_not_read_candidate" if rules["profiles"][requested]["family"] == "luna"
+                           else "requested_profile_not_eligible")
+        if rules["profiles"][requested].get("explicit_only"):
+            candidates.append(requested)
+        elif requested not in candidates:
+            return blocked("requested_profile_not_eligible")
     candidates = [p for p in dict.fromkeys(candidates) if p not in (denied or [])]
     if available is not None:
         candidates = [p for p in candidates if p in available]
@@ -342,6 +386,10 @@ def dispatch_receipt_issues(packet: dict, stage: str) -> list[str]:
             and not (packet.get("work", {}).get("analysis") is True
                      and packet.get("work", {}).get("operation") in policy().get("analysis_operations", []))):
         issues.append("dispatch_astra_requires_analysis")
+    if (expected.get("family") == "luna"
+            and (target_role not in policy().get("luna_roles", [])
+                 or packet.get("work", {}).get("operation") not in policy().get("luna_operations", []))):
+        issues.append("dispatch_luna_not_read_candidate")
     if expected.get("explicit_only"):
         override = runtime.get("explicit_override")
         if (not isinstance(override, dict) or override.get("profile") != expected_profile
@@ -614,6 +662,14 @@ def gate(packet: dict, stage: str = "preflight") -> dict:
                         if (expected_profile.get("family") == "astra"
                                 and str(required_target).rsplit("__", 1)[0] not in policy().get("analysis_roles", [])):
                             issues.append("delegation_astra_role_not_analytic:" + child["id"])
+                        if (expected_profile.get("family") == "astra"
+                                and not (child.get("analysis") is True
+                                         and child.get("operation") in policy().get("analysis_operations", []))):
+                            issues.append("delegation_astra_requires_analysis:" + child["id"])
+                        if (expected_profile.get("family") == "luna"
+                                and (target_role not in policy().get("luna_roles", [])
+                                     or child.get("operation") not in policy().get("luna_operations", []))):
+                            issues.append("delegation_luna_not_read_candidate:" + child["id"])
                         if expected_profile.get("explicit_only"):
                             override = child.get("explicit_override")
                             if (not isinstance(override, dict) or override.get("profile") != profile_id

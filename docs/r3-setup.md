@@ -19,6 +19,8 @@ El último comando es una previsualización. Para WSL usar `--profile wsl-shared
 van bajo CODEX_HOME/skills; en WSL las compartidas van bajo ~/.agents/skills.
 El launcher utiliza exactamente la misma raíz, con espacios entre comillas.
 `--scope routing` deja intactas las skills CI/CD y el launcher Supabase existentes.
+`--skill NOMBRE` es repetible y añade únicamente las skills seleccionadas del repo
+al scope base; no usar `--scope all` para actualizar unas pocas skills.
 
 ## Aplicación protegida
 
@@ -35,12 +37,13 @@ python3 scripts/install.py --profile codex-macos --scope workflow --check
 ```
 
 `--configure-root` es opt-in: solo actualiza model y model_reasoning_effort del
-nivel raíz de config.toml. No modifica credenciales, MCP, roles personalizados,
+nivel raíz y los dos defaults de `[agents]` en config.toml. Conserva credenciales,
+MCP y demás campos; genera las definiciones administradas según el perfil. No modifica
 sesiones activas ni límites administrados. Los defaults de los trabajadores
-canónicos se instalan según el perfil del host: principal high, implementer medium
-y variantes Sol medium/high para el despacho. Una definición Astra high heredada
-puede existir para roles read-only, pero queda bloqueada por la política y no se
-selecciona ni despacha; los workers no heredan Astra accidentalmente.
+canónicos se instalan según la matriz GPT-6 de la política: principal Sol medium,
+explorador Luna high, perfiles analíticos Astra low y esfuerzo por tarea.
+Astra high no forma parte del catálogo activo; cualquier definición heredada queda
+fuera del despacho permitido. No activar perfiles por mera presencia de un TOML.
 Los archivos de versiones anteriores que ya no administra esta revisión no se
 borran automáticamente. Reconciliarlos si colisionan con el catálogo activo.
 
@@ -57,12 +60,12 @@ No revierte productos, archivos ajenos, operaciones externas ni estado de sesion
 
 ## Routing determinista
 
-La política local selecciona el perfil antes del dispatch. El principal usa Sol high;
-un implementador solo usa Sol medium cuando las decisiones están resueltas y la
-ejecución es rutinaria. La ejecución exigente o desconocida usa Sol high. Astra
-low/medium queda limitada a análisis con evidencia del principal. Ninguna selección
-local constituye prueba de que el host cargó el modelo: el adaptador debe comprobar
-el archivo de definición y el perfil efectivo.
+La política local selecciona el perfil antes del dispatch. Principal GPT-6 Sol
+medium; ejecución exigente Sol high; ejecución desconocida requiere clasificación.
+Astra low/medium solo análisis y Luna high solo bloques de exploración/documentación
+acotados. Consultar `skills/dautia-project-cycle/references/model-routing.md`.
+Ninguna selección local prueba que el host cargó el modelo; verificar definición,
+contexto runtime y resultado terminal por separado.
 
 Una instalación previa puede conservar un launcher local de Jev o una personalización
 fuera del conjunto administrado. El rollback no lo borra automáticamente: primero se
@@ -99,7 +102,7 @@ escritor autorizado y QA valida después. No se afirma equivalencia App/CLI/Curs
 
 ## Prueba del host antes de adopción
 
-Verificar versión/descubrimiento de roles, perfil realmente aplicado (principal high,
+Verificar versión/descubrimiento de roles, perfil realmente aplicado (principal GPT-6 Sol medium,
 implementer medium o high según el encargo), retorno de un hijo,
 consulta analítica Astra sin escritura, rechazo de contradicción, pausa/reanudación,
 artefactos QA y preservación de cambios ajenos. La medición de modelos reportados

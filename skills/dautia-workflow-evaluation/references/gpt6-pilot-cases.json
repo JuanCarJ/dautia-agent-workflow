@@ -1,0 +1,267 @@
+[
+  {
+    "id": "copy",
+    "request": "Cambia Guardar por Guardar cambios, conserva el resto y no publiques.",
+    "context": "Cambio local explícito, decisiones resueltas y alcance rutinario.",
+    "expected": {
+      "route": "sol-medium",
+      "operation": "implement-local",
+      "close": "focal-check"
+    },
+    "acceptable": {
+      "close": [
+        "focal-check",
+        "visible-content-and-focal-check"
+      ]
+    }
+  },
+  {
+    "id": "explore",
+    "request": "Localiza dónde se produce y consume el campo status.",
+    "context": "Lectura acotada de tres archivos; listado de productores y consumidores.",
+    "expected": {
+      "route": "luna-high",
+      "operation": "read-only",
+      "close": "evidence-map"
+    }
+  },
+  {
+    "id": "extract-docs",
+    "request": "Lista comandos de prueba existentes, sin inventar ninguno.",
+    "context": "Documentos canónicos identificados; extracción literal acotada.",
+    "expected": {
+      "route": "luna-high",
+      "operation": "read-only",
+      "close": "evidence-map"
+    }
+  },
+  {
+    "id": "feature",
+    "request": "Añade el filtro aprobado y prueba los consumidores afectados.",
+    "context": "Contrato de API aprobado, ejecución rutinaria, dos consumidores conocidos.",
+    "expected": {
+      "route": "sol-medium",
+      "operation": "implement-local",
+      "close": "focal-check"
+    },
+    "acceptable": {
+      "close": [
+        "focal-check",
+        "focal-regression",
+        "compatible-revisions-and-checks"
+      ]
+    }
+  },
+  {
+    "id": "heavy-feature",
+    "request": "Implementa la máquina de estados ya aprobada.",
+    "context": "Decisiones resueltas, ejecución exigente con concurrencia e idempotencia.",
+    "expected": {
+      "route": "sol-high",
+      "operation": "implement-local",
+      "close": "focal-regression"
+    }
+  },
+  {
+    "id": "unknown-difficulty",
+    "request": "Implementa este bloque.",
+    "context": "Objetivo aprobado pero complejidad de ejecución desconocida: no se inspeccionaron consumidores.",
+    "expected": {
+      "route": "sol-medium",
+      "operation": "classify-before-write",
+      "close": "preparation-pending"
+    },
+    "acceptable": {
+      "route": [
+        "sol-medium",
+        "luna-high",
+        "sol-high"
+      ]
+    }
+  },
+  {
+    "id": "contradictory-discovery",
+    "request": "Ayúdame a decidir la experiencia de reservas.",
+    "context": "Fuentes vigentes se contradicen sobre actor y cancelación; el usuario no ha aprobado nueva semántica.",
+    "expected": {
+      "route": "astra-low",
+      "operation": "read-only",
+      "close": "plan-only"
+    },
+    "acceptable": {
+      "route": [
+        "sol-medium",
+        "astra-low"
+      ]
+    }
+  },
+  {
+    "id": "cross-architecture",
+    "request": "Analiza el cambio de identidad entre tres sistemas y propón estrategia.",
+    "context": "Tradeoffs difíciles de consistencia, compatibilidad móvil y reversión; no se autoriza implementar.",
+    "expected": {
+      "route": "astra-medium",
+      "operation": "read-only",
+      "close": "plan-only"
+    }
+  },
+  {
+    "id": "ux-audit",
+    "request": "Audita experiencia y jerarquía de esta consola audiovisual.",
+    "context": "Interfaz observable, decisiones abiertas importantes de navegación y prioridad.",
+    "expected": {
+      "route": "astra-low",
+      "operation": "read-only",
+      "close": "plan-only"
+    },
+    "acceptable": {
+      "close": [
+        "plan-only",
+        "evidence-map",
+        "visual-and-functional-evidence"
+      ]
+    }
+  },
+  {
+    "id": "kmeans-visible",
+    "request": "Haz visible cómo se calculan perfiles K-Means y se asignan colores.",
+    "context": "Semántica aprobada, cambio focal en UI existente; documentación sola no cumple.",
+    "expected": {
+      "route": "sol-medium",
+      "operation": "implement-local",
+      "close": "visible-content-and-focal-check"
+    }
+  },
+  {
+    "id": "landing",
+    "request": "Implementa la landing según dirección visual aprobada.",
+    "context": "Identidad, assets, contenido y motion ya definidos; conservar accesibilidad.",
+    "expected": {
+      "route": "sol-medium",
+      "operation": "implement-local",
+      "close": "visual-and-functional-evidence"
+    },
+    "acceptable": {
+      "route": [
+        "sol-medium",
+        "sol-high"
+      ]
+    }
+  },
+  {
+    "id": "ios-maps",
+    "request": "Corrige que seleccionar un pin mueva la cámara sin pedirlo.",
+    "context": "Bug reproducido de estado SwiftUI; causa aún no probada, sin autoridad de TestFlight.",
+    "expected": {
+      "route": "sol-high",
+      "operation": "diagnose-before-patch",
+      "close": "focal-regression"
+    },
+    "acceptable": {
+      "route": [
+        "sol-medium",
+        "sol-high",
+        "astra-low"
+      ]
+    }
+  },
+  {
+    "id": "multirepo",
+    "request": "Implementa el contrato aprobado en API, admin e iOS.",
+    "context": "Ejecución exigente; revisiones compatibles, consumidores y regresiones de cada frontera.",
+    "expected": {
+      "route": "sol-high",
+      "operation": "implement-local",
+      "close": "compatible-revisions-and-checks"
+    }
+  },
+  {
+    "id": "db-no-staging",
+    "request": "Corrige el parser y prueba la DB.",
+    "context": "Solo producción configurada; tests puros disponibles; staging obligatorio por política.",
+    "expected": {
+      "route": "sol-medium",
+      "operation": "pure-work-only",
+      "close": "db-boundary-blocked"
+    }
+  },
+  {
+    "id": "security",
+    "request": "Audita seguridad del flujo de invitaciones; no cambies nada.",
+    "context": "Petición explícita, candidato identificado y riesgo de permisos cruzados.",
+    "expected": {
+      "route": "sol-high",
+      "operation": "read-only",
+      "close": "security-findings"
+    },
+    "acceptable": {
+      "route": [
+        "sol-high",
+        "astra-low",
+        "astra-medium"
+      ]
+    }
+  },
+  {
+    "id": "staging-checklist",
+    "request": "Haz checklist para pasar staging a main.",
+    "context": "No hay revisión independiente del SHA actual ni prueba Android; pedir checklist no autoriza merge.",
+    "expected": {
+      "route": "sol-medium",
+      "operation": "read-only",
+      "close": "release-blocked"
+    }
+  },
+  {
+    "id": "server-release",
+    "request": "Despliega el SHA revisado en el servicio X de servidor_do_1.",
+    "context": "Target, alcance, recuperación y operación autorizados; runbook rutinario verificado.",
+    "expected": {
+      "route": "sol-medium",
+      "operation": "authorized-release",
+      "close": "readback-required"
+    }
+  },
+  {
+    "id": "unknown-payment",
+    "request": "El POST de contabilización dio timeout; resuélvelo.",
+    "context": "Resultado incierto, endpoint de consulta por referencia disponible.",
+    "expected": {
+      "route": "sol-medium",
+      "operation": "reconcile-before-write",
+      "close": "no-retry-until-reconciled"
+    },
+    "acceptable": {
+      "route": [
+        "sol-medium",
+        "sol-high"
+      ]
+    }
+  },
+  {
+    "id": "scratch",
+    "request": "Completa el filtro de la parte funcional de MaderCore.",
+    "context": "Slice funcional documentado y decisiones resueltas; demo separada pendiente.",
+    "expected": {
+      "route": "sol-medium",
+      "operation": "implement-local",
+      "close": "active-scope-only"
+    }
+  },
+  {
+    "id": "android-upload",
+    "request": "Ya pasó Simulator iOS; da por probado Android y producción.",
+    "context": "No hay ejecución Android ni comprobación del despliegue; no fabricar evidencia.",
+    "expected": {
+      "route": "sol-medium",
+      "operation": "verify-missing-boundary",
+      "close": "android-and-production-unverified"
+    },
+    "acceptable": {
+      "route": [
+        "sol-medium",
+        "sol-high"
+      ]
+    }
+  }
+]

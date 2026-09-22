@@ -4,10 +4,11 @@ Workflow portable para Codex y Cursor, separado de los productos. Esta revisión
 un candidato de piloto: controles ejecutables y pruebas locales no equivalen a
 validación real de modelos, Desktop, dispositivos o proveedores.
 
-Sol 5.6 high permanece en el principal. El implementador definido usa medium;
+GPT-6 Sol medium es el principal. El implementador definido usa medium;
 la ejecución técnicamente exigente usa high. Astra se reserva para análisis
-justificado y nunca autoriza acciones. Las skills conservan sus criterios.
-[Routing r3.2](skills/dautia-project-cycle/references/model-routing.md) describe
+justificado y nunca autoriza acciones. Luna high cubre exploración/extracción acotada.
+Las skills conservan sus criterios y permisos.
+[Routing GPT-6](skills/dautia-project-cycle/references/model-routing.md) describe
 selección determinista, destinos generados y verificación del despacho.
 No se incorpora un fork de FirstMate ni un supervisor adicional.
 
@@ -47,7 +48,7 @@ En WSL usar `--profile wsl-shared`; respeta CODEX_HOME y comparte skills en
 `--adopt-existing` sin inspección; ese flag adopta exactamente los archivos previstos
 con respaldo. Nunca borra archivos ajenos. No modifica sesiones ni activa hooks.
 
-Guía: [setup y piloto](docs/r3-setup.md). Modelo/capacidades reales y hooks necesitan
+Guías: [setup y piloto](docs/r3-setup.md) y [adopción GPT-6](docs/gpt6-adoption.md). Modelo/capacidades reales y hooks necesitan
 smoke en cada host. Cursor hereda su selector: no se anuncia paridad de routing.
 
 ## Multirepo y auditorías

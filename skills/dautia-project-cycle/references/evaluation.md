@@ -15,7 +15,7 @@ No interpretar precio API como credito de cuenta. Un resultado verde aislado no 
 superioridad de esfuerzo. Empezar con pocos casos; ampliar solo incertidumbres decisivas.
 
 El recolector de project-cycle se documenta en observability.md; no es gate ni fase.
-No activar una automatizacion sin cadencia solicitada. Sol high es la base habitual provisional; no implica mejora medida.
+No activar una automatizacion sin cadencia solicitada. GPT-6 Sol medium es la base habitual provisional; no implica mejora medida.
 Version nueva se carga en
 sesiones nuevas; antes de mutacion externa desde una tarea previa, reconciliar contrato.
 
@@ -40,11 +40,10 @@ no prueba despacho. Las simulaciones deben verificar parentesco y turn_context
 propios y perfil al producir respuestas con consumo, artefacto/aceptacion,
 regresion focal y ausencia de mutaciones externas. Un contexto de inicializacion
 sin respuesta no demuestra ejecucion con ese esfuerzo.
-Los catalogos/resultados v11/v12 son historicos: para v13 congelar una rubrica
-nueva con product_discovery Astra low e implementer Sol medium para el bloque
-resuelto. No usar sus expectativas antiguas para diagnosticar una violacion v13
-ni modificar retrospectivamente resultados originales. Despacho forzado no
-demuestra seleccion autonoma; explicitar cual de los dos se esta midiendo.
+Los catalogos/resultados v11/v12 son historicos y conservan perfiles y resultados.
+Para GPT-6 congelar una rubrica nueva coherente con la politica vigente; no usar
+expectativas antiguas como incumplimientos actuales ni reescribir resultados.
+Despacho forzado no demuestra seleccion autonoma; explicitar cual se mide.
 Incluir casos simples sin delegacion, cambio de fase y correcciones materiales.
 No dar expected answers al ejecutor; congelar rubrica, conservar fallos originales
 y exigir casos negativos (hijo ausente, perfil distinto, requisito omitido).

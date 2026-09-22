@@ -1,68 +1,87 @@
-# Execution profiles · routing r3.2
+# Execution profiles · GPT-6
 
-La política canónica está en `../config/routing-policy.json`. El principal permanece
-`gpt-5.6-sol/high`. El implementador usa `gpt-5.6-sol/medium` únicamente cuando el
-bloque está definido, las decisiones están resueltas y la ejecución es rutinaria.
-La ejecución exigente o desconocida usa Sol high.
+La fuente canónica es `../config/routing-policy.json`. Principal: GPT-6 Sol medium.
+Un override de esta conversación no cambia el default del host ni el de los hijos.
+Los perfiles son un punto inicial; la aceptación y permisos son comunes a todos.
 
-## Preparación e implementación
+## Matriz de entrada
 
-Para `implementer`, `implementer_complex` y `systems_implementer` que escriben
-producto o tests, el handoff debe declarar `work.decisions_resolved: true` y
-`work.execution_difficulty` como `routine`, `demanding` o `unknown`.
+| Rol | Perfil inicial | Criterio para otra selección |
+|---|---|---|
+| principal | sol_medium | high si la coordinación/análisis realmente lo requiere |
+| code_explorer | luna_high | sol_medium/high para contratos o dependencias difíciles |
+| product_discovery | sol_medium | astra_low ante decisiones importantes contradictorias; medium si la incertidumbre transversal lo exige |
+| systems_analyst | astra_low | medium para alternativas transversales especialmente difíciles |
+| implementer | sol_medium | high para ejecución exigente con decisiones resueltas |
+| implementer_complex | sol_high | xhigh solo con autorización explícita vigente |
+| systems_implementer | sol_high | si se descompone en bloques rutinarios, usar implementer |
+| ux_auditor | astra_low | medium para juicio UX/arquitectura de información especialmente difícil |
+| independent_reviewer | sol_medium | high para lógica/contratos/migraciones y regresiones complejas |
+| data_security | sol_high | consulta Astra low/medium si aporta; solo petición explícita, solo lectura |
+| decision_gate | sol_high | consulta Astra medium para alternativas transversales materialmente riesgosas |
+| documental | sol_medium | luna_high para extracción/inventario; Astra low para contradicciones sustantivas |
+| qa_web, qa_ios, qa_android, qa_e2e | sol_medium | high por estados, concurrencia, lifecycle o recorridos complejos |
+| release_operator | sol_medium | high para reconciliación operativa excepcional |
 
-- La ejecución rutinaria y definida puede usar Sol medium.
-- La ejecución demanding usa Sol high sin downgrade automático.
-- La dificultad unknown usa Sol high como fallback.
-- Decisiones de producto o arquitectura abiertas vuelven a análisis; no se resuelven
-  aumentando el esfuerzo del escritor.
+No invocar todos los roles para cada tarea. Una consulta breve queda con el
+principal. `systems_analyst`/`ux_auditor` entran cuando hay una pregunta analítica
+sustantiva; su nombre no demuestra que esa pregunta exista. Sol también resuelve
+trabajo ambiguo y complejo. No añadir una consulta Astra para ratificar cada paso.
 
-## Análisis y Astra
+## Preparación y selección
 
-Los roles analíticos pueden usar Sol high, Astra low o Astra medium cuando el
-principal aporta evidencia y el alcance justifica el coste. Astra nunca escribe
-producto ni ejecuta operaciones externas bajo esta política. No se elige por nombre
-del rol, número de archivos, marca o sensibilidad.
+Para escritores de producto/tests, declarar `decisions_resolved: true` y
+`execution_difficulty: routine|demanding|unknown`. Unknown bloquea el despacho hasta
+clasificar la ejecución; decisiones abiertas vuelven al análisis pertinente.
+El bloque rutinario usa su perfil de entrada; demanding requiere Sol high. Usar
+`implementer` para un bloque rutinario, no inflar el rol por tamaño del proyecto.
 
-`runtime.principal_choice` permite seleccionar un perfil ordinario elegible con
-referencias de evidencia. No es una aprobación, no cambia la autoridad y no prueba
-que el host haya cargado el modelo.
+Luna high solo participa en exploración/documentación acotada, con salida definida,
+sin producto ni operaciones externas. Astra low/medium solo análisis. La limitación
+es una política de DautIA, no una incapacidad de esos modelos. No rebajar revisiones,
+pruebas, aceptación o permisos por seleccionar un perfil más económico.
 
-Perfiles explicit-only, como Sol xhigh, requieren un override explícito del usuario
-ligado a sus referencias. El techo de Astra es medium. La disponibilidad observada,
-los perfiles denegados, capacidades y presupuesto se validan antes del dispatch.
-Nunca se hace un downgrade silencioso ni se inventa un perfil disponible.
+`runtime.principal_choice` selecciona entre perfiles elegibles con evidencia.
+Un fallo no provoca una escalera automática: distinguir contexto incompleto,
+hipótesis refutada, herramienta/proveedor y dificultad del razonamiento.
+Sol xhigh exige `explicit_override` de usuario; no habilitar max/ultra ni Astra
+por encima de medium. Ausencia/capacity no autoriza sustitución silenciosa.
 
-## Generación y dispatch
+## Generación y despacho
 
-El generador valida los defaults de cada host y crea nombres cualificados
-`ROLE__PROFILE`. Las variantes de Astra solo se generan para roles analíticos. Una
-variante es configuración, no un agente ejecutándose ni un supervisor adicional.
+El generador deriva los TOML base y `ROLE__PROFILE` de política y perfil del host.
+No escoger el modelo por una declaración del propio agente. El TOML personalizado
+puede tener prioridad sobre el modelo solicitado: comprobar definición y ejecución.
 
 ```sh
 dautia-workflow dispatch-plan PACKET --agents-dir CODEX_HOME/agents --cwd WORKSPACE
 ```
 
-El comando valida el packet, selecciona el perfil local, enlaza la decisión al
-contexto y política, y comprueba el TOML exacto. El principal debe invocar ese
-`agent_type` con el mismo handoff. El callback nativo debe registrar el perfil
-reportado; un archivo generado no prueba runtime efectivo.
+Preparar el packet, usar el destino exacto, `fork_turns: "none"` y contexto suficiente:
+aceptación, alcance, fuentes, candidato, entorno y dependencias resueltas. No pasar
+el historial completo ni crear nietos. Conservar `runtime.required_agent_type` y
+recibo terminal con perfil observado, referencia del hijo y evidencia. Genérico,
+perfil distinto o hijo incompleto bloquean cierre; no reemplazarlos por trabajo
+propio del principal. Un callback que repite la petición no prueba enforcement.
 
-`workflow_dispatch.dispatch_prepared` consume una sola vez el callback del host,
-separa perfil solicitado/configurado/reportado y exige reconciliación ante un
-resultado incierto. No reintenta automáticamente y no usa red ni otro proveedor.
-El callback debe devolver el mismo `agent_type` cualificado que preparó el plan,
-`fork_turns: "none"` y el modelo/esfuerzo observados. Para bloques materiales se
-conserva además un `runtime.dispatch_receipt` terminal con `status: "completed"`,
-referencia y evidencia. Un worker genérico, profundidad `all`, ausencia de perfil
-o hijo incompleto (incluido capacity) queda como violación y bloquea closeout/release.
-En una superficie visual amplia, `visual_validation.content_checks` debe enlazar
-la aceptación de contenido visible (explicaciones, estados, colores o acciones
-que el usuario debe entender); una captura sin esa lectura no es evidencia suficiente.
+Conservar modelo completo, esfuerzo, revisión/hash de política y procedencia de
+observación. Un antiguo `sol_medium` no equivale a GPT-6 Sol medium. La configuración,
+la petición, el contexto observado y el resultado aceptado son afirmaciones distintas.
+No modificar sesiones activas para hacerlas coincidir con los nuevos defaults.
 
-## Evaluación
+## Skills y evidencia
 
-La calidad se evalúa con tareas comparables, esfuerzo total aceptado, regresiones,
-tiempo, intervención humana y resultado real. Los conteos de tests o una opinión
-de un modelo no son ground truth. Las skills aportan método; esta política decide
-el perfil y no modifica autoridad ni aceptación.
+Las skills conservan método, autoridad y aceptación compartidos. No crear copias
+por modelo. Las diferencias de prompting, si aportan, deben cargarse explícitamente
+por configuración comprobada; cambiar el modelo no cambia automáticamente las skills.
+Leer solo referencias pertinentes. Conservar comandos de prueba y guardas de entorno.
+En UI, verificar significado/contenido visible y diseño preservado, también para
+cambios focales. Un test verde o captura sin interpretación no prueba el requisito.
+
+## Adopción
+
+Comparar primero 5.6/6 con esfuerzo comparable y luego medium/high de GPT-6, con
+aceptación y fixtures congelados. Replays de decisiones no son benchmarks de producto.
+Medir correcciones, defectos, tiempo y uso de raíz+hijos; unknown no es cero.
+Fuentes: https://learn.chatgpt.com/docs/models y
+https://developers.openai.com/codex/agent-configuration/subagents.

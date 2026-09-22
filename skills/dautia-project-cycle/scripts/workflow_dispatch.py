@@ -105,6 +105,19 @@ def prepare_dispatch(packet: dict, decision: dict, agents_dir: Path) -> dict:
               'native_enforcement_verified': False, 'authorizes_action': False,
               'fork_turns_requested': 'none', 'required_agent_type': target,
               'required_profile': selected}
+    result['model_provenance'] = {
+        'profile_id': selected,
+        'policy_hash': result['policy_hash'],
+        'definition_hash': result['definition_hash'],
+        'configured_source': 'routing_policy_and_generated_definition',
+        'model_configured': profile['model'],
+        'effort_configured': profile['effort'],
+        'reported_source': None,
+        'model_reported': None,
+        'effort_reported': None,
+        'callback_metadata_matched': None,
+        'provider_verified': False,
+    }
     # Runtime timings and external metadata can vary between identical
     # evaluations. They belong in the audit plan, not the idempotency key.
     result['dispatch_key'] = fingerprint({
@@ -184,10 +197,15 @@ def dispatch_prepared(packet: dict, decision: dict, prepared: dict, agents_dir: 
     model, effort = returned.get('model'), returned.get('model_reasoning_effort')
     contract_issues = validate_spawn_report(current, returned)
     mismatch = bool(contract_issues)
+    provenance = dict(current['model_provenance'], reported_source='native_callback_metadata',
+                      model_reported=model, effort_reported=effort,
+                      callback_metadata_matched=not mismatch)
     result = dict(current, status='dispatch_contract_violation' if mismatch else 'started',
                   dispatch_performed=True, child_reference=child, model_reported=model,
                   effort_reported=effort, delivery_received=False, dispatch_id=dispatch_id,
-                  native_enforcement_verified=not mismatch,
+                  native_enforcement_verified=False,
+                  native_callback_metadata_matched=not mismatch,
+                  model_provenance=provenance,
                   dispatch_contract_issues=contract_issues)
     if events_root is not None:
         # Only opaque correlation escapes into telemetry; no prompts or native IDs.

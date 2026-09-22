@@ -1,12 +1,20 @@
 {
   "schema_version": 1,
-  "policy_revision": "r3.2",
-  "default_profile": "sol_high",
+  "policy_revision": "r3.3-gpt6",
+  "default_profile": "sol_medium",
+  "demanding_implementation_profile": "sol_high",
   "maximum_astra_effort": "medium",
   "ordinary_analysis_profiles": [
+    "sol_medium",
     "sol_high",
+    "luna_high",
     "astra_low",
     "astra_medium"
+  ],
+  "ordinary_default_profiles": [
+    "sol_medium",
+    "sol_high",
+    "luna_high"
   ],
   "analysis_roles": [
     "principal",
@@ -27,22 +35,35 @@
     "read",
     "write_artifact"
   ],
+  "luna_roles": [
+    "code_explorer",
+    "documental"
+  ],
+  "luna_operations": [
+    "read",
+    "write_artifact"
+  ],
   "profiles": {
     "sol_high": {
-      "model": "gpt-5.6-sol",
+      "model": "gpt-6-sol",
       "effort": "high",
       "family": "sol"
     },
     "sol_medium": {
-      "model": "gpt-5.6-sol",
+      "model": "gpt-6-sol",
       "effort": "medium",
       "family": "sol"
     },
     "sol_xhigh": {
-      "model": "gpt-5.6-sol",
+      "model": "gpt-6-sol",
       "effort": "xhigh",
       "family": "sol",
       "explicit_only": true
+    },
+    "luna_high": {
+      "model": "gpt-6-luna",
+      "effort": "high",
+      "family": "luna"
     },
     "astra_low": {
       "model": "gpt-6-astra",
@@ -53,12 +74,6 @@
       "model": "gpt-6-astra",
       "effort": "medium",
       "family": "astra"
-    },
-    "astra_high": {
-      "model": "gpt-6-astra",
-      "effort": "high",
-      "family": "astra",
-      "explicit_only": true
     }
   },
   "astra_product_writes": false,
@@ -66,7 +81,13 @@
   "default_changes_parent": false,
   "model_claim_level": "configured_not_provider_verified",
   "role_defaults": {
-    "implementer": "sol_medium"
+    "code_explorer": "luna_high",
+    "data_security": "sol_high",
+    "decision_gate": "sol_high",
+    "implementer_complex": "sol_high",
+    "systems_analyst": "astra_low",
+    "systems_implementer": "sol_high",
+    "ux_auditor": "astra_low"
   },
   "implementation_roles": [
     "implementer",

@@ -14,73 +14,73 @@
     "shared_infrastructure": true
   },
   "codex_root": {
-    "model": "gpt-5.6-sol",
-    "reasoning_effort": "high"
+    "model": "gpt-6-sol",
+    "reasoning_effort": "medium"
   },
   "codex_agents": {
     "code_explorer": [
-      "gpt-5.6-sol",
+      "gpt-6-luna",
       "high"
     ],
     "data_security": [
-      "gpt-5.6-sol",
+      "gpt-6-sol",
       "high"
     ],
     "decision_gate": [
-      "gpt-5.6-sol",
+      "gpt-6-sol",
       "high"
     ],
     "documental": [
-      "gpt-5.6-sol",
-      "high"
+      "gpt-6-sol",
+      "medium"
     ],
     "implementer": [
-      "gpt-5.6-sol",
+      "gpt-6-sol",
       "medium"
     ],
     "implementer_complex": [
-      "gpt-5.6-sol",
+      "gpt-6-sol",
       "high"
     ],
     "independent_reviewer": [
-      "gpt-5.6-sol",
-      "high"
+      "gpt-6-sol",
+      "medium"
     ],
     "product_discovery": [
-      "gpt-5.6-sol",
-      "high"
+      "gpt-6-sol",
+      "medium"
     ],
     "qa_android": [
-      "gpt-5.6-sol",
-      "high"
+      "gpt-6-sol",
+      "medium"
     ],
     "qa_e2e": [
-      "gpt-5.6-sol",
-      "high"
+      "gpt-6-sol",
+      "medium"
     ],
     "qa_ios": [
-      "gpt-5.6-sol",
-      "high"
+      "gpt-6-sol",
+      "medium"
     ],
     "qa_web": [
-      "gpt-5.6-sol",
-      "high"
+      "gpt-6-sol",
+      "medium"
     ],
     "release_operator": [
-      "gpt-5.6-sol",
-      "high"
+      "gpt-6-sol",
+      "medium"
     ],
     "systems_analyst": [
-      "gpt-5.6-sol",
-      "high"
+      "gpt-6-astra",
+      "low"
     ],
     "systems_implementer": [
-      "gpt-5.6-sol",
+      "gpt-6-sol",
       "high"
     ],
     "ux_auditor": [
-      "gpt-5.6-sol",
-      "high"
+      "gpt-6-astra",
+      "low"
     ]
   },
   "cursor_agents": {

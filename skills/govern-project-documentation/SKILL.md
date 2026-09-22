@@ -62,6 +62,12 @@ Instruction precedence is:
 
 When a lower-priority source conflicts but the conflict does not affect the current objective, apply precedence silently and continue. If it matters, describe the exact affected contract; do not infer that all documentation is unreliable.
 
+Keep proposed, accepted, implemented, verified and deployed states distinct. Preserve
+source statements and mark superseded decisions; use the existing canonical spec,
+not a new SPEC.md by default. Design references include accepted assets/components,
+allowed delta and source-to-build lineage. Infrastructure keeps stable non-secret
+identities, writer and procedures separate from observed SHA/deployment/incidents.
+
 Keep mutable product state out of agent instruction files. A technical repo that must operate independently should document its role, governance location, Gitflow, environment limits, tests, and fallback when the governance repo is unavailable.
 
 Use stable IDs where formal traceability is required:
@@ -72,6 +78,11 @@ business rule -> requirement -> decision/increment -> PR or commit
 ```
 
 Planned work may stop at source, decision, acceptance, and future increment. Do not demand release evidence before implementation exists or a full matrix for a small routine documentation update.
+
+For design documentation ownership or traceability, use
+[design continuity](../dautia-project-cycle/references/continuity.md#documentar-el-diseno).
+Keep the existing canonical home; ordinary design updates stay with the implementer
+and reviewer rather than activating a separate governance pass.
 
 ## Implement and verify
 

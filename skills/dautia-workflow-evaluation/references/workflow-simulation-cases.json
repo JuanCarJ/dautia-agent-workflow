@@ -1,0 +1,39 @@
+[
+  {
+    "id": "templorojo-filters",
+    "summary": "Freeze catalog facet semantics and implement coordinated filtering.",
+    "required_agents": {
+      "product_discovery": ["gpt-5.6-sol", "high"],
+      "ux_auditor": ["gpt-6-astra", "low"],
+      "implementer_complex": ["gpt-5.6-sol", "high"]
+    },
+    "mutable_files": ["catalog_filters.py"],
+    "prompt": "Forced role-resolution simulation on a sanitized fixture. No providers, network, Git, release, extra agents or writes outside this case directory. Spawn exactly product_discovery, ux_auditor and implementer_complex with fork_turns=none; wait for every child. product_discovery must resolve the supplied facet requirements and return a compact handoff without editing. ux_auditor must independently review the supplied acceptance for visibility, recovery and keyboard semantics without editing. Give both findings plus the frozen acceptance to implementer_complex. Require implementer_complex to emit exactly CONTRACT_RECEIPT TR-FACETS-V1 same-variant-stock-positive url-roundtrip removable-stale no-modal in its own assistant output after receiving the map and before its first edit. It then exclusively owns catalog_filters.py and must use apply_patch for every edit, implement the smallest pure-Python solution and run public_tests.py. The root may inspect and run tests but must not edit. Preserve: OR within colors, OR within sizes, AND across facets, color and size must match the same in-stock variant, URL round-trip, stale/zero-result selections remain removable, and no modal. Do not claim browser observation."
+  },
+  {
+    "id": "image-batch",
+    "summary": "Reconcile a complete product-color-view image universe before closure.",
+    "required_agents": {
+      "implementer": ["gpt-5.6-sol", "medium"]
+    },
+    "mutable_files": ["media_batch.py", "manifest.json"],
+    "prompt": "Forced role-resolution simulation on a sanitized image inventory. No image processing, providers, network, Git, release, extra agents or writes outside this case directory. Spawn exactly implementer with fork_turns=none and wait for it. It exclusively owns media_batch.py and manifest.json and must use apply_patch for every edit, including the final manifest. Implement complete reconciliation of every product x color x view row from inventory.json, preserve every original source, mark white-background rows correct-background and the rest keep, create deterministic output paths only for corrected rows, write the complete manifest, and run public_tests.py. The root may inspect and run tests but must not edit. A recent subset is insufficient; closure requires the whole declared universe with no duplicates or omissions."
+  },
+  {
+    "id": "ryven-regressions",
+    "summary": "Map coupled admin selector and Journey-state risks, then fix the defined regression slice.",
+    "required_agents": {
+      "systems_analyst": ["gpt-6-astra", "medium"],
+      "implementer_complex": ["gpt-5.6-sol", "high"]
+    },
+    "mutable_files": ["admin_flow.py", "journey_state.py"],
+    "prompt": "Forced role-resolution simulation on sanitized Ryven-like files. No providers, devices, network, Git, release, extra agents or writes outside this case directory. First spawn exactly systems_analyst with fork_turns=none to map the admin radio selector and Journey state contracts without editing; wait for it. After receiving its result and before spawning downstream, emit one concise root message explicitly labeled handoff that states the analyst's actual radio, 30-minute, guidance and failed-cancel conclusions. Then give that map and the frozen acceptance to exactly one implementer_complex with fork_turns=none. Require implementer_complex to emit exactly CONTRACT_RECEIPT RYVEN-REGRESSIONS-V1 canonical-ticket-radio threshold-30 guidance-suppresses failed-cancel-active in its own assistant output after receiving the map and before its first edit. Wait for it, and let it exclusively own admin_flow.py and journey_state.py using apply_patch for every edit. The root may inspect and run tests but must not edit. Acceptance: the admin flow selects canonical input[type=radio][name=iconLabel][value=ticket], never the stale select or tag alias; intent appears at 30 minutes without progress, not 29; active guidance suppresses it; Continue resumes active; failed Cancel recovers active instead of stranding the sheet. Run public_tests.py. Do not claim device or provider proof."
+  },
+  {
+    "id": "copy-no-delegation",
+    "summary": "Change one button label directly and prove no child was created.",
+    "required_agents": {},
+    "mutable_files": ["button.html"],
+    "prompt": "Negative routing control on a sanitized fixture. Do not spawn or delegate to any agent. No network, providers, Git, release or writes outside this case directory. Directly change only the visible button text Guardar to Guardar cambios in button.html; preserve all markup, attributes, style and script bytes otherwise. Run public_tests.py and stop."
+  }
+]
