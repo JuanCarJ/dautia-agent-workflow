@@ -56,6 +56,15 @@ historial completo, perfil ausente/distinto o hijo incompleto (incluido capacity
 bloquean cierre; un artefacto del principal no sustituye la entrega del hijo.
 Modelo solicitado o TOML no prueban ejecución efectiva ni enforcement universal.
 
+Para una implementación material de producto, tests, migración o configuración
+versionada, la delegación es obligatoria antes de escribir: debe intervenir un
+`implementer__PROFILE`, `implementer_complex__PROFILE` o
+`systems_implementer__PROFILE`. La ejecución directa queda limitada a un delta
+trivial o a una excepción explícita del usuario registrada con alcance trivial,
+fuente y razón. La falta de trabajo concurrente no justifica saltarse este gate.
+Todo código versionado requiere además autor, revisor independiente y veredicto
+del head final antes de integrar; el principal no puede sustituir esos recibos.
+
 Un escritor por bloque/workspace, un operador por recurso mutable compartido;
 no operar a la vez el mismo navegador, simulador o acción externa. Aislar cuando
 aporte valor. Profundidad uno: sin nietos ni coordinadores/supervisores paralelos.
