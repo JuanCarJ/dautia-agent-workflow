@@ -31,6 +31,12 @@ def packet(operation='read', role='systems_analyst', mode='AUDIT'):
        'skills':[{'id':'diagnosing-bugs','kind':'diagnosis','expected_hash':'e'*64,'loaded_hash':'e'*64}],
        'control':{'budget_remaining':True},'runtime':{'available_profiles':['sol_high','astra_low','astra_medium'],'harness':'codex','available_targets':['systems_analyst','systems_analyst__astra_low','systems_analyst__astra_medium']},
        'data_sharing':{'approved':True,'authority_ref':'synthetic-fixture-only'}}
+    if operation in ('write_product', 'write_tests') and mode == 'IMPLEMENTATION':
+        p['runtime'].update(required_agent_type='implementer__sol_medium', required_profile='sol_medium',
+                            dispatch_receipt={'status':'completed','agent_type':'implementer__sol_medium',
+                                              'fork_turns':'none','child_reference':'fixture-child',
+                                              'evidence':['fixture-terminal'],'model_observed':'gpt-6-sol',
+                                              'effort_observed':'medium'})
     p['checks']=[{'id':'C1','requirement_id':'R1','status':'passed','candidate_hash':fingerprint(p['candidate']),
                   'acceptance_hash':fingerprint(p['requirements']),'evidence_kind':'tool_result','evidence':['fixture-observation-1']}]
     p['review']={'required':True,'status':'approved','author_run':'author1','reviewer_run':'reviewer1','evidence':['review-1'],
@@ -201,6 +207,7 @@ class CoreTests(unittest.TestCase):
         p=packet('write_product', 'implementer', 'IMPLEMENTATION')
         p['runtime'].update(dispatch_required=True, required_agent_type='implementer__sol_medium',
                             required_profile='sol_medium')
+        p['runtime'].pop('dispatch_receipt', None)
         issues = gate(p, 'closeout')['issues']
         self.assertIn('dispatch_receipt_required', issues)
         p['runtime']['dispatch_receipt'] = {

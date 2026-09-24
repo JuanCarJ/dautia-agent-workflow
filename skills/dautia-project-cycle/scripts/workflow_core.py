@@ -337,17 +337,40 @@ def next_action(packet: dict) -> dict:
 def dispatch_receipt_issues(packet: dict, stage: str) -> list[str]:
     """Check the terminal evidence for a required native delegation.
 
-    Dispatch preparation and execution are separate from closeout.  This gate
-    is opt-in through ``runtime.dispatch_required``/``required_agent_type`` so
-    trivial reads and packets that never delegated remain unchanged.
+    Dispatch preparation and execution are separate from closeout.  Material
+    product/test implementations are delegated by default; only a declared,
+    user-authorized direct-execution exception can opt out.  Reads and
+    non-product artifacts remain direct unless their packet explicitly requires
+    a child.
     """
     if stage not in ("closeout", "release"):
         return []
     runtime = packet.get("runtime", {})
-    required = runtime.get("dispatch_required") is True or nonempty(runtime.get("required_agent_type"))
+    work = packet.get("work", {})
+    direct_exception = runtime.get("direct_execution_exception")
+    direct_exception_valid = (
+        isinstance(direct_exception, dict)
+        and direct_exception.get("scope") == "trivial"
+        and direct_exception.get("source_kind") == "user"
+        and refs(direct_exception.get("source_refs"))
+        and nonempty(direct_exception.get("reason"))
+    )
+    material_write = (
+        work.get("material", True) is True
+        and work.get("operation") in ("write_product", "write_tests")
+        and work.get("mode") == "IMPLEMENTATION"
+        and not direct_exception_valid
+    )
+    required = material_write or runtime.get("dispatch_required") is True or nonempty(runtime.get("required_agent_type"))
     if not required:
         return []
     issues: list[str] = []
+    if (direct_exception is not None and not direct_exception_valid
+            and work.get("operation") in ("write_product", "write_tests")):
+        issues.append("invalid_direct_execution_exception")
+    if material_write and not nonempty(runtime.get("required_agent_type")):
+        issues.append("mandatory_dispatch_target_missing")
+        return issues
     target = runtime.get("required_agent_type")
     if not nonempty(target):
         issues.append("required_agent_type_missing")
@@ -366,6 +389,8 @@ def dispatch_receipt_issues(packet: dict, stage: str) -> list[str]:
     if not refs(receipt.get("evidence")):
         issues.append("dispatch_terminal_evidence_required")
     target_role, target_profile = target.rsplit("__", 1) if "__" in target else ("", "")
+    if material_write and target_role not in policy().get("implementation_roles", []):
+        issues.append("mandatory_implementation_agent_required")
     if target_role != packet.get("work", {}).get("role"):
         issues.append("dispatch_target_role_mismatch")
     expected_profile = runtime.get("required_profile")
@@ -400,6 +425,47 @@ def dispatch_receipt_issues(packet: dict, stage: str) -> list[str]:
     if receipt.get("effort_observed") != expected.get("effort"):
         issues.append("dispatch_reported_effort_mismatch")
     return issues
+
+
+def mandatory_dispatch_plan_issues(packet: dict, stage: str) -> list[str]:
+    """Require a qualified implementation destination before material writing.
+
+    The closeout receipt gate prevents a false completion, while this earlier
+    gate prevents the implementation from starting without a resolved native
+    destination.  A direct path is valid only for the explicit trivial user
+    exception already defined by the packet contract.
+    """
+    if stage != "preflight":
+        return []
+    work = packet.get("work", {})
+    if (work.get("material", True) is not True
+            or work.get("operation") not in ("write_product", "write_tests")
+            or work.get("mode") != "IMPLEMENTATION"):
+        return []
+    runtime = packet.get("runtime", {})
+    direct_exception = runtime.get("direct_execution_exception")
+    direct_exception_valid = (
+        isinstance(direct_exception, dict)
+        and direct_exception.get("scope") == "trivial"
+        and direct_exception.get("source_kind") == "user"
+        and refs(direct_exception.get("source_refs"))
+        and nonempty(direct_exception.get("reason"))
+    )
+    if direct_exception_valid:
+        return []
+    target = runtime.get("required_agent_type")
+    if not nonempty(target):
+        return ["mandatory_dispatch_target_missing"]
+    if "__" not in target:
+        return ["mandatory_dispatch_target_malformed"]
+    target_role, target_profile = target.rsplit("__", 1)
+    if target_role not in policy().get("implementation_roles", []):
+        return ["mandatory_implementation_agent_required"]
+    if target_profile not in policy().get("profiles", {}):
+        return ["mandatory_dispatch_profile_invalid"]
+    if runtime.get("required_profile") != target_profile:
+        return ["mandatory_dispatch_profile_mismatch"]
+    return []
 
 
 def visual_surface_issues(packet: dict, stage: str) -> list[str]:
@@ -544,6 +610,7 @@ def gate(packet: dict, stage: str = "preflight") -> dict:
             issues.append("external_target_unverified")
     if not set(w.get("required_capabilities", [])).issubset(set(packet.get("available_capabilities", []))):
         issues.append("capability_unverified")
+    issues.extend(mandatory_dispatch_plan_issues(packet, stage))
     action = next_action(packet)
     if action["action"] == "stop":
         issues.append(action["reason"])

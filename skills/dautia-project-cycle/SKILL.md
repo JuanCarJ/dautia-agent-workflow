@@ -22,13 +22,17 @@ Use one compact private packet per active objective/block, following
 [packet example](examples/r3-analysis.json). No packet for a trivial direct read.
 
 ```sh
+# For material implementation, resolve the qualified child first.
+python3 scripts/workflow_cli.py dispatch-plan PACKET --agents-dir CODEX_HOME/agents --cwd WORKSPACE
+# Add the exact returned runtime.required_agent_type, then run the gates.
 python3 scripts/workflow_cli.py gate preflight PACKET --cwd WORKSPACE
 python3 scripts/workflow_cli.py gate dispatch PACKET --cwd WORKSPACE
 python3 scripts/workflow_cli.py gate closeout PACKET --cwd WORKSPACE
 ```
 
-Preflight precedes material writing; dispatch precedes delegation; closeout precedes
-handback. Exit 3 means unresolved conditions, 2 invalid input/storage. Resolve or report
+For material implementation, dispatch-plan and the exact target precede writing and
+preflight; dispatch precedes delegation; closeout precedes handback. Direct trivial
+reads and explicit trivial exceptions may run preflight without a child. Exit 3 means unresolved conditions, 2 invalid input/storage. Resolve or report
 the boundary, not bypass it. Gates refresh declared sources and check supplied facts;
 they do not certify semantic truth, user consent or provider state.
 
@@ -37,16 +41,24 @@ For complete, partial or scratch project documentation, apply
 to the active objective. A functional slice can close while an unrelated demo remains
 pending; incomplete active context blocks its product closeout/release, not discovery.
 
-## Delegate when useful
+## Delegate material work by default
+
+For a material product, test, migration or versioned configuration change, the
+root must delegate the implementation to a qualified implementation agent before
+writing: `implementer__PROFILE`, `implementer_complex__PROFILE`, or
+`systems_implementer__PROFILE`. The principal may coordinate and inspect, but its
+own artifact cannot replace the implementer's terminal receipt. Direct execution
+is allowed only for a trivial delta or an explicit user-authorized exception
+recorded with `scope: trivial`, `source_kind: user`, `source_refs` and a reason.
+“No concurrent work” is not enough to bypass this rule for material product work.
+
+Every product-code implementation also requires an independent reviewer before
+integration. Broad or redesigned visual work additionally requires
+`ux_auditor__PROFILE`. If a required child is unavailable or incomplete, closeout
+is blocked; report that boundary instead of silently taking over.
 
 Before material delegation read [model routing](references/model-routing.md), prepare
-the worker packet and execute:
-
-```sh
-python3 scripts/workflow_cli.py dispatch-plan PACKET --agents-dir CODEX_HOME/agents --cwd WORKSPACE
-```
-
-Use observed host availability and the exact returned qualified target. For writers,
+the worker packet and use the dispatch-plan command above. Use observed host availability and the exact returned qualified target. For writers,
 resolve decisions and classify execution routine/demanding; unknown requires preparation.
 The role policy, not parent effort, selects the profile. Record the exact native target,
 `fork_turns: "none"`, actual start, observed model/effort, child reference and completed
